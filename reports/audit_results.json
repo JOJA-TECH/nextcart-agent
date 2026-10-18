@@ -1,0 +1,270 @@
+{
+  "metadata": {
+    "dataset": "instacart-online-grocery-basket-analysis-dataset",
+    "executed_at_utc": "2026-10-18T16:05:49Z",
+    "python_version": "3.14.8",
+    "seed": 42,
+    "platform": "Linux x86_64 (equipo local)",
+    "data_path": "/home/chaos/Projects/universidad/ia/nextcart-agent/dataset",
+    "sampling": {
+      "used": false,
+      "method": null,
+      "seed": 42,
+      "description": "Sin muestreo: se auditan todos los usuarios y órdenes del dataset."
+    }
+  },
+  "files": {
+    "orders": {
+      "rows": 3421083,
+      "columns": [
+        "order_id",
+        "user_id",
+        "eval_set",
+        "order_number",
+        "order_dow",
+        "order_hour_of_day",
+        "days_since_prior_order"
+      ],
+      "size_bytes": 108968645
+    },
+    "order_products_prior": {
+      "rows": 32434489,
+      "columns": [
+        "order_id",
+        "product_id",
+        "add_to_cart_order",
+        "reordered"
+      ],
+      "size_bytes": 577550706
+    },
+    "order_products_train": {
+      "rows": 1384617,
+      "columns": [
+        "order_id",
+        "product_id",
+        "add_to_cart_order",
+        "reordered"
+      ],
+      "size_bytes": 24680147
+    },
+    "products": {
+      "rows": 49688,
+      "columns": [
+        "product_id",
+        "product_name",
+        "aisle_id",
+        "department_id"
+      ],
+      "size_bytes": 2166953
+    },
+    "aisles": {
+      "rows": 134,
+      "columns": [
+        "aisle_id",
+        "aisle"
+      ],
+      "size_bytes": 2603
+    },
+    "departments": {
+      "rows": 21,
+      "columns": [
+        "department_id",
+        "department"
+      ],
+      "size_bytes": 270
+    }
+  },
+  "assumptions": {
+    "S1_schema_integrity": {
+      "status": "PASS",
+      "metrics": {
+        "column_checks": {
+          "orders": {
+            "missing": [],
+            "pass": true
+          },
+          "order_products_prior": {
+            "missing": [],
+            "pass": true
+          },
+          "order_products_train": {
+            "missing": [],
+            "pass": true
+          },
+          "products": {
+            "missing": [],
+            "pass": true
+          },
+          "aisles": {
+            "missing": [],
+            "pass": true
+          },
+          "departments": {
+            "missing": [],
+            "pass": true
+          }
+        },
+        "uniqueness": {
+          "orders_order_id_duplicates": 0,
+          "prior_order_product_duplicates": 0,
+          "train_order_product_duplicates": 0
+        },
+        "referential": {
+          "prior_order_id_orphans": 0,
+          "train_order_id_orphans": 0,
+          "prior_product_id_orphans": 0,
+          "train_product_id_orphans": 0,
+          "product_aisle_orphans": 0,
+          "product_department_orphans": 0
+        },
+        "null_counts": {
+          "orders_null_user_id": 0,
+          "orders_null_order_number": 0,
+          "orders_null_days_since_prior": 206209,
+          "first_order_with_days_since_prior": 0,
+          "non_first_order_null_days_since_prior": 0,
+          "orders_total": 3421083
+        }
+      },
+      "figures": [],
+      "interpretation": "Los seis archivos tienen las columnas requeridas, las claves primarias no presentan duplicados y no hay huérfanos de orden, producto, pasillo o departamento. Los nulos de days_since_prior_order se concentran exclusivamente en la primera compra de cada usuario (206209 nulos), que es el comportamiento esperado: no hay intervalo previo. Esto permite reconstruir cestas y secuencias sin imputación.",
+      "limitations": [
+        "La integridad referencial no valida contenido semántico de nombres de producto.",
+        "order_hour_of_day viene como texto con cero inicial; se convierte con TRY_CAST."
+      ]
+    },
+    "S2_sequential_history": {
+      "status": "PASS",
+      "metrics": {
+        "users_with_order_number_gaps": 0,
+        "eval_set_counts": {
+          "train": 131209,
+          "prior": 3214874,
+          "test": 75000
+        },
+        "users_with_multiple_non_prior_orders": 0,
+        "train_users_with_train_order_not_last": 0,
+        "days_since_prior_mean": 11.114836226863012,
+        "days_since_prior_median": 7.0,
+        "days_since_prior_p90": 30.0,
+        "days_since_prior_max": 30.0,
+        "users_total": 206209
+      },
+      "figures": [
+        "figures/orders_per_user.png",
+        "figures/days_since_prior.png",
+        "figures/split_composition.png"
+      ],
+      "interpretation": "Cada usuario tiene su secuencia de órdenes numerada desde 1 sin huecos, lo que permite usar order_number como eje temporal de cestas. Cada usuario eval_set=train/test tiene exactamente una orden final etiquetada y esta es la más reciente, por lo que el split oficial prior→train es coherente con una predicción de próxima cesta sin mezclar futuro. La tasa de reorden de ítems en órdenes prior es 0.590, señal de que la recompra es un componente real del problema.",
+      "limitations": [
+        "No hay timestamps absolutos: order_dow/order_hour_of_day y days_since_prior son la única señal temporal disponible.",
+        "La continuidad de order_number no garantiza que la tienda no haya tenido quiebres de stock no observados."
+      ]
+    },
+    "S3_basket_density": {
+      "status": "PASS",
+      "metrics": {
+        "prior": {
+          "n_baskets": 3214874,
+          "mean_size": 10.088883421247614,
+          "median_size": 8.0,
+          "p90_size": 20.0,
+          "p99_size": 35.0,
+          "max_size": 145,
+          "share_baskets_ge_2_items": 0.951242879192155
+        },
+        "train": {
+          "n_baskets": 131209,
+          "mean_size": 10.552759338155157,
+          "median_size": 9.0,
+          "p90_size": 21.0,
+          "max_size": 80
+        },
+        "catalog": {
+          "distinct_products": 49688,
+          "products_appearing_in_prior": 49677,
+          "coverage_of_catalog_in_prior": 0.9997786185799388,
+          "top20pct_products_share_of_rows": 0.9097904085986988
+        },
+        "items_per_user_prior": {
+          "mean": 157.28939571017753,
+          "median": 83.0,
+          "p90": 386.0
+        }
+      },
+      "figures": [
+        "figures/basket_size_distribution.png",
+        "figures/product_frequency_longtail.png"
+      ],
+      "interpretation": "El 95.1% de las cestas prior tienen al menos 2 productos, condición necesaria para estimar coocurrencia. La cesta media tiene 10.1 productos (mediana 8), suficiente para reglas locales sin explodir combinatoriamente. El catálogo es de largo plazo: solo el 20% superior de productos cubre el 91.0% de las filas, por lo que el fallback de popularidad será útil en cold start y el modelo debe combinar reglas (cola) con frecuencia global (cabeza).",
+      "limitations": [
+        "Instacart no expone stock real: una cesta puede reflejar sustituciones, no la demanda ideal.",
+        "La cola larga implica que miles de productos tendrán pocas o ninguna regla con min_support>=5; el agente debe degradar a popularidad para esos casos."
+      ]
+    },
+    "S4_complementarity_signal": {
+      "status": "PASS",
+      "metrics": {
+        "reorder_flag_rate_prior": 0.5896974667922161,
+        "repeat_item_share_in_baskets_sample": 0.8796299066858738,
+        "pair_sample": {
+          "users": 30000,
+          "baskets": 467882,
+          "products": 43896,
+          "distinct_pairs": 10948440,
+          "mean_pair_support": 3.178470357420783,
+          "max_pair_support": 9540,
+          "median_pair_support": 1.0,
+          "share_pairs_support_ge_2": 0.3749012644723815,
+          "share_pairs_support_ge_5": 0.11464071593761303
+        }
+      },
+      "figures": [
+        "figures/cooccurrence_support_hist.png"
+      ],
+      "interpretation": "La bandera reordered marca el 59.0% de los ítems prior y, definiendo repetición de forma estricta (el producto ya apareció en una compra anterior del mismo usuario), el 88.0% de los ítems de las cestas son repetidos. En la muestra de pares hay 10,948,440 pares distintos y el 11.5% alcanza soporte >= 5, es decir existe masa suficiente para reglas de coocurrencia explicables con min_support=5. El histograma muestra la típica distribución de cola larga: muchos pares raros y una cabeza de pares muy estables que son los que el agente debe explotar.",
+      "limitations": [
+        "El supuesto S4 se calcula sobre una muestra de usuarios (máximo 30000) por costo computacional; se documenta aquí y no afecta al entrenamiento, que sí usa todas las órdenes prior.",
+        "Coocurrencia no implica causalidad ni complementariedad comercial (p. ej. se compran juntos por oferta); solo asocia."
+      ]
+    },
+    "S5_leakage_free_evaluation": {
+      "status": "PASS",
+      "metrics": {
+        "checks": {
+          "order_id_disjoint_prior_train": true,
+          "train_order_is_last_for_user": true,
+          "every_train_user_has_prior_history": true,
+          "prior_orders_strictly_before_train": true,
+          "test_users_have_no_label": true
+        },
+        "train_users": 131209,
+        "test_users": 75000,
+        "train_order_id_overlap_prior_train_files": 0
+      },
+      "figures": [
+        "figures/s5_leakage_checks.png"
+      ],
+      "interpretation": "El split oficial esutilizable sin leakage si: (1) los order_id de order_products__prior y order_products__train no se solapan; (2) para cada usuario train, su orden etiquetada es la más reciente; (3) toda orden prior ocurre estrictamente antes; (4) las reglas se entrenan solo con prior y el objetivo (cesta train) nunca entra como variable. Con estas condiciones, evaluar la próxima cesta sobre usuarios train es una estimación honesta del desempeño offline. Los 75k usuarios test no tienen ground truth público y quedan excluidos de la evaluación supervisada.",
+      "limitations": [
+        "No hay impresiones de recomendaciones, exposición ni aceptación en Instacart: el split solo valida precisión de predicción de cesta, no conversión comercial.",
+        "La ausencia de group control impide estimar el lift causal del widget."
+      ]
+    }
+  },
+  "decision": {
+    "dataset_usable": true,
+    "status": "usable_with_restrictions",
+    "reason": "El dataset permite entrenar y evaluar offline un recomendador de próxima cesta con split prior/train libre de leakage. Restricción: no contiene inventario real, precios, posición del widget, impresiones ni aceptación, por lo que los objetivos comerciales (p. ej. 12% de aceptación) solo pueden validarse con un A/B real en producción.",
+    "required_actions": [
+      "Entrenar solo con órdenes prior (nunca con la cesta objetivo).",
+      "Filtrar inventario y rechazos en tiempo de inferencia con datos de la tienda.",
+      "Diseñar un A/B de dos semanas con asignación aleatoria para medir aceptación."
+    ],
+    "risks": [
+      "Sin datos de stock real, el filtro de agotados debe venir del sistema de la tienda.",
+      "La coocurrencia captura hábitos históricos de usuarios de 2017 de Instacart; puede no transferirse a otra tienda sin reentrenar.",
+      "La evaluación offline no mide satisfacción ni aceptación de usuario."
+    ]
+  }
+}

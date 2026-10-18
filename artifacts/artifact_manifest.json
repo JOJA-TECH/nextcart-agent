@@ -1,0 +1,10 @@
+{
+  "model_path": "nextcart_model.json",
+  "model_version": "0.1.0+20261018T162516Z",
+  "created_at_utc": "2026-10-18T16:25:19Z",
+  "source_dataset": "instacart-online-grocery-basket-analysis-dataset",
+  "training_code_version": "0.1.0",
+  "audit_results_path": "../reports/audit_results.json",
+  "metrics_path": "reports/model_metrics.json",
+  "sha256": "d9b508cbd6468b329153bdbde6358255344402ad602a507eceafbf5aa8162155"
+}

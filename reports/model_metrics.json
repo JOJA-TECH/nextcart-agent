@@ -1,0 +1,182 @@
+{
+  "metadata": {
+    "generated_at_utc": "2026-10-18T17:14:38Z",
+    "python_version": "3.14.8",
+    "seed": 42,
+    "data_path": "/home/chaos/Projects/universidad/ia/nextcart-agent/dataset",
+    "model_path": "artifacts/nextcart_model.json",
+    "model_version": "0.1.0+20261018T162516Z",
+    "model_status": "candidate",
+    "sampling": {
+      "used": false,
+      "method": null,
+      "seed": 42,
+      "description": null
+    },
+    "workers": 2,
+    "wall_seconds": 435.6
+  },
+  "methodology": {
+    "split": "oficial Instacart prior/train (usuarios con eval_set='train')",
+    "description": "Historial = todas las órdenes prior del usuario; objetivo = su orden train (la más reciente). Las reglas del modelo se entrenaron solo con prior. Los usuarios eval_set='test' se excluyen por no tener ground truth público. Offline no hay carrito parcial, inventario real ni rechazos: los filtros del modelo final son inercios aquí y solo se prueban en inferencia/tests.",
+    "users_in_split_train": 131209,
+    "users_evaluated": 131209,
+    "baskets_evaluated": 131209,
+    "history_rows": 20641991,
+    "target_rows": 1384617,
+    "eval_ks": [
+      1,
+      3,
+      5,
+      10
+    ],
+    "history_items_used": 50
+  },
+  "models": {
+    "topfreq": {
+      "description": "Baseline: productos globalmente más frecuentes (popularidad pura).",
+      "n_users": 131209,
+      "metrics_by_k": {
+        "1": {
+          "precision_at_k": 0.1179797117575776,
+          "recall_at_k": 0.012942814960799081,
+          "hit_rate_at_k": 0.1179797117575776,
+          "map_at_k": 0.1179797117575776
+        },
+        "3": {
+          "precision_at_k": 0.10756630007596309,
+          "recall_at_k": 0.03216836027884185,
+          "hit_rate_at_k": 0.29801309361400513,
+          "map_at_k": 0.07397104365300108
+        },
+        "5": {
+          "precision_at_k": 0.08790707954484957,
+          "recall_at_k": 0.04283706159236357,
+          "hit_rate_at_k": 0.35351233528187853,
+          "map_at_k": 0.055239238754794466
+        },
+        "10": {
+          "precision_at_k": 0.06803877782774295,
+          "recall_at_k": 0.06506010690045176,
+          "hit_rate_at_k": 0.4435518904953166,
+          "map_at_k": 0.04025646906732886
+        }
+      },
+      "catalog_coverage": {
+        "distinct_recommended": 10,
+        "catalog_size": 49688,
+        "coverage_fraction": 0.00020125583641925616
+      },
+      "repeat_explore": {
+        "repeat_hits": 72202,
+        "explore_hits": 17071,
+        "repeat_share_of_hits": 0.8087775699259575
+      },
+      "latency_ms": {
+        "mean": 0.0005270751223465292,
+        "p95": 0.0008719998731976375,
+        "max": 0.7423500001095817
+      }
+    },
+    "cooccur": {
+      "description": "Coocurrencia por confianza, sin blend de popularidad, boost de recompra ni filtros avanzados.",
+      "n_users": 131209,
+      "metrics_by_k": {
+        "1": {
+          "precision_at_k": 0.12733882584273945,
+          "recall_at_k": 0.014208678099989465,
+          "hit_rate_at_k": 0.12733882584273945,
+          "map_at_k": 0.12733882584273945
+        },
+        "3": {
+          "precision_at_k": 0.11141004046978717,
+          "recall_at_k": 0.036006440916181034,
+          "hit_rate_at_k": 0.2814669725399934,
+          "map_at_k": 0.08051996771901566
+        },
+        "5": {
+          "precision_at_k": 0.1012476278304104,
+          "recall_at_k": 0.05352093055118747,
+          "hit_rate_at_k": 0.3781295490400811,
+          "map_at_k": 0.0633789708700541
+        },
+        "10": {
+          "precision_at_k": 0.08352475821018772,
+          "recall_at_k": 0.08627452622126748,
+          "hit_rate_at_k": 0.5078233962609272,
+          "map_at_k": 0.0490790307064759
+        }
+      },
+      "catalog_coverage": {
+        "distinct_recommended": 5871,
+        "catalog_size": 49688,
+        "coverage_fraction": 0.1181573015617453
+      },
+      "repeat_explore": {
+        "repeat_hits": 92791,
+        "explore_hits": 16801,
+        "repeat_share_of_hits": 0.8466950142346157
+      },
+      "latency_ms": {
+        "mean": 2.494315779115851,
+        "p95": 4.383995999887702,
+        "max": 159.9232389999088
+      }
+    },
+    "nextcart_final": {
+      "description": "Modelo final: coocurrencia + popularidad + boost de recompra sobre historial; filtros de inventario/rechazo aplicados (inercios offline: Instacart no expone stock ni rechazos).",
+      "n_users": 131209,
+      "metrics_by_k": {
+        "1": {
+          "precision_at_k": 0.2751259441044441,
+          "recall_at_k": 0.034263611672494,
+          "hit_rate_at_k": 0.2751259441044441,
+          "map_at_k": 0.2751259441044441
+        },
+        "3": {
+          "precision_at_k": 0.2221900428578273,
+          "recall_at_k": 0.08027272746926743,
+          "hit_rate_at_k": 0.48904419666333865,
+          "map_at_k": 0.17882411521567376
+        },
+        "5": {
+          "precision_at_k": 0.19437843440618718,
+          "recall_at_k": 0.11343020038496818,
+          "hit_rate_at_k": 0.5863317302928915,
+          "map_at_k": 0.144522094097543
+        },
+        "10": {
+          "precision_at_k": 0.15608151879825383,
+          "recall_at_k": 0.1724514873916305,
+          "hit_rate_at_k": 0.7003635421350669,
+          "map_at_k": 0.11665680825108825
+        }
+      },
+      "catalog_coverage": {
+        "distinct_recommended": 2051,
+        "catalog_size": 49688,
+        "coverage_fraction": 0.041277572049589435
+      },
+      "repeat_explore": {
+        "repeat_hits": 199382,
+        "explore_hits": 5411,
+        "repeat_share_of_hits": 0.9735781984735806
+      },
+      "latency_ms": {
+        "mean": 2.621385020006422,
+        "p95": 3.8568549998672097,
+        "max": 25.540151000313926
+      }
+    }
+  },
+  "figures": [
+    "figures/model_metrics_at_k.png",
+    "figures/repeat_explore_share.png"
+  ],
+  "warnings": [
+    "Recall@K/Precision@K/HitRate@K/MAP@K son métricas offline de predicción de cesta; NO son tasas de conversión ni de aceptación comercial.",
+    "Instacart no contiene impresiones de recomendaciones, exposición, grupo control ni aceptación: el objetivo comercial de 12% de aceptación solo puede medirse con un A/B real de dos semanas en producción.",
+    "Los filtros de inventario y rechazo del modelo final no se pueden ejecutar offline con datos reales de la tienda.",
+    "Cobertura y latencia dependen del hardware local y del tamaño del modelo."
+  ]
+}

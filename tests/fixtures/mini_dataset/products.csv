@@ -1,0 +1,11 @@
+product_id,product_name,aisle_id,department_id
+1,Bananas,1,1
+2,Apples,1,1
+3,Milk,2,1
+4,Bread,3,1
+5,Eggs,2,1
+6,Cheese,2,1
+7,Yogurt,2,1
+8,Orange Juice,1,1
+9,Tomatoes,1,1
+10,Rare Crackers,3,1
