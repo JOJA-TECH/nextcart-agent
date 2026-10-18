@@ -1,15 +1,31 @@
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react"
 import { Alert, Box, Grid, HStack, Heading, Text, VStack } from "@chakra-ui/react"
 import type { NextCartClient } from "@/shared/api/contracts"
 import { CartSummary } from "./CartSummary"
 import { CheckoutHeader } from "./CheckoutHeader"
 import { RecommendationWidget } from "@/features/recommendations/components/RecommendationWidget"
 import { useRecommendations } from "@/features/recommendations/hooks/useRecommendations"
-import { MetricsSummaryPanel } from "@/features/diagnostics/components/MetricsSummaryPanel"
 import { DEMO_DATA_NOTE } from "@/shared/catalog-demo"
 import { NO_AI_NOTE } from "@/shared/ai/no-ai"
-import { DiagnosticsPanel } from "@/features/diagnostics/components/DiagnosticsPanel"
 import { useHealthPoll } from "@/features/diagnostics/hooks/useHealthPoll"
+
+// Paneles de diagnóstico bajo demanda: no forman parte del bundle inicial.
+const DiagnosticsPanel = lazy(() =>
+  import("@/features/diagnostics/components/DiagnosticsPanel").then((m) => ({
+    default: m.DiagnosticsPanel,
+  })),
+)
+const MetricsSummaryPanel = lazy(() =>
+  import("@/features/diagnostics/components/MetricsSummaryPanel").then((m) => ({
+    default: m.MetricsSummaryPanel,
+  })),
+)
+
+const panelFallback = (
+  <Text textStyle="sm" color="fg.muted">
+    Cargando panel…
+  </Text>
+)
 
 export interface CheckoutPageProps {
   client: NextCartClient
@@ -22,7 +38,14 @@ export const BASE_INVENTORY: Record<string, boolean> = {
 
 export function CheckoutPage({ client }: CheckoutPageProps) {
   const [cart, setCart] = useState<number[]>([24852, 13176])
-  const [sessionId] = useState(() => `sess-${Math.random().toString(36).slice(2, 8)}`)
+  // Sesión persistente: los rechazados sobreviven a recargas de la página.
+  const [sessionId] = useState(() => {
+    const stored = window.localStorage.getItem("nextcart_session_id")
+    if (stored) return stored
+    const fresh = `sess-${Math.random().toString(36).slice(2, 8)}`
+    window.localStorage.setItem("nextcart_session_id", fresh)
+    return fresh
+  })
   const { health, state, detail, refresh: refreshHealth } = useHealthPoll(client)
   const [metricsNonce, setMetricsNonce] = useState(0)
 
@@ -33,6 +56,16 @@ export function CheckoutPage({ client }: CheckoutPageProps) {
   useEffect(() => {
     void refreshHealth()
   }, [refreshHealth])
+
+  // Re-consulta con debounce al cambiar el carrito (incluye el montaje inicial);
+  // se keyea solo por cart para no re-disparar tras cada voto.
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      void recommendations.fetchRecommendations()
+    }, 400)
+    return () => clearTimeout(timer)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cart])
 
   const healthError = health.kind === "error" ? health.error : null
 
@@ -98,7 +131,9 @@ export function CheckoutPage({ client }: CheckoutPageProps) {
               />
 
               <Box display={{ base: "block", lg: "none" }}>
-                <MetricsSummaryPanel client={client} refreshNonce={metricsNonce} />
+                <Suspense fallback={panelFallback}>
+                  <MetricsSummaryPanel client={client} refreshNonce={metricsNonce} />
+                </Suspense>
               </Box>
             </VStack>
 
@@ -112,19 +147,23 @@ export function CheckoutPage({ client }: CheckoutPageProps) {
               </Box>
 
               <Box display={{ base: "none", lg: "block" }}>
-                <MetricsSummaryPanel client={client} refreshNonce={metricsNonce} />
+                <Suspense fallback={panelFallback}>
+                  <MetricsSummaryPanel client={client} refreshNonce={metricsNonce} />
+                </Suspense>
               </Box>
             </VStack>
           </Grid>
 
-          <DiagnosticsPanel
-            backendState={state}
-            inventory={BASE_INVENTORY}
-            onRunHealthCheck={() => {
-              void refreshHealth()
-              onBackendEvent()
-            }}
-          />
+          <Suspense fallback={panelFallback}>
+            <DiagnosticsPanel
+              backendState={state}
+              inventory={BASE_INVENTORY}
+              onRunHealthCheck={() => {
+                void refreshHealth()
+                onBackendEvent()
+              }}
+            />
+          </Suspense>
 
           <Text textStyle="2xs" color="fg.subtle" textAlign="center" pb="6">
             {NO_AI_NOTE}
