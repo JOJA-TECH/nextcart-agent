@@ -21,6 +21,7 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI, Header, HTTPException, Response
+from fastapi.middleware.cors import CORSMiddleware
 
 from src.artifacts import ModelLoadError
 from src.config import DISCLAIMER_AB_TEST, PROJECT_ROOT
@@ -105,6 +106,19 @@ def create_app(
         yield
 
     app = FastAPI(title="NEXTCART-AGENT", version="0.1.0", lifespan=lifespan)
+    # CORS para el frontend en desarrollo (Vite dev :5173 y preview :4173);
+    # en producción también se puede usar el proxy inverso sin CORS.
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=[
+            "http://localhost:5173",
+            "http://127.0.0.1:5173",
+            "http://localhost:4173",
+            "http://127.0.0.1:4173",
+        ],
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
     app.state.nc = state
     app.state.admin_token = env_token
 
