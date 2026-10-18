@@ -1,0 +1,44 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - run: uv sync --extra dev
+      - run: uv run pytest
+
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5 # uvicorn del webServer de Playwright
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 12
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+      - name: Instalar dependencias
+        run: pnpm install
+        working-directory: frontend
+      - name: Typecheck
+        run: pnpm exec tsc -b
+        working-directory: frontend
+      - name: Build
+        run: pnpm build
+        working-directory: frontend
+      - name: Instalar Chromium
+        run: pnpm exec playwright install --with-deps chromium
+        working-directory: frontend
+      - name: E2E (T01–T04, T07–T09, backend apagado)
+        run: pnpm exec playwright test
+        working-directory: frontend
