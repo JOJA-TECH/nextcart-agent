@@ -11,6 +11,8 @@ node_modules
 dist
 dist-ssr
 *.local
+test-results
+playwright-report
 
 # Local env files (keep .env.example)
 .env

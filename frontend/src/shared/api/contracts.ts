@@ -38,7 +38,7 @@ export interface RecommendationResponse {
   session_id: string
   recommendations: Recommendation[]
   fallback: boolean
-  model_version: string | null
+  model_version: string
   latency_ms: number
   warnings: string[]
 }
@@ -47,7 +47,7 @@ export interface ImpressionEvent {
   session_id: string
   recommendation_ids: number[]
   cart: number[]
-  model_version: string | null
+  model_version: string
 }
 
 export type FeedbackKind = "accepted" | "rejected" | "ignored"
@@ -64,7 +64,7 @@ export interface MetricsSummary {
   accepted: number
   rejected: number
   ignored: number
-  acceptance_rate_observed: number
+  acceptance_rate_observed: number | null
   catalog_coverage_observed: number
   latency_mean_ms: number
   latency_p95_ms: number

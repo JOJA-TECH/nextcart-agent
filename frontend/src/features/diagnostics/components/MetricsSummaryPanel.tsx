@@ -88,7 +88,11 @@ export function MetricsSummaryPanel({ client, refreshNonce }: MetricsSummaryPane
               <MetricCard label="Ignoradas" value={String(metrics.ignored)} />
               <MetricCard
                 label="Tasa de aceptación"
-                value={formatPercent(metrics.acceptance_rate_observed)}
+                value={
+                  metrics.acceptance_rate_observed == null
+                    ? "—"
+                    : formatPercent(metrics.acceptance_rate_observed)
+                }
                 tone="success"
               />
               <MetricCard

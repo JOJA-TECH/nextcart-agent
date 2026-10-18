@@ -36,6 +36,8 @@ export function RecommendationCard(props: RecommendationCardProps) {
 
   const product = lookupDemoProduct(productId)
   const unavailable = !inventoryAvailable
+  // Un solo voto por producto: evita los badges aceptado+rechazado a la vez.
+  const voted = accepted || rejected || ignored
 
   return (
     <Card.Root
@@ -114,12 +116,20 @@ export function RecommendationCard(props: RecommendationCardProps) {
             colorPalette="green"
             onClick={onAccept}
             loading={busy}
-            disabled={unavailable}
+            disabled={unavailable || voted}
+            aria-label={`Agregar ${product.name} al carrito`}
           >
             <LuShoppingCart />
             Agregar
           </Button>
-          <Button size="xs" colorPalette="red" variant="outline" onClick={onReject} disabled={busy}>
+          <Button
+            size="xs"
+            colorPalette="red"
+            variant="outline"
+            onClick={onReject}
+            disabled={busy || voted}
+            aria-label={`No me interesa ${product.name}`}
+          >
             <LuTrash2 />
             No me interesa
           </Button>
@@ -128,7 +138,8 @@ export function RecommendationCard(props: RecommendationCardProps) {
             variant="ghost"
             color="fg.muted"
             onClick={onIgnore}
-            disabled={busy}
+            disabled={busy || voted}
+            aria-label={`Registrar ${product.name} como ignorada`}
           >
             <LuMinus />
             Registrar ignorada
