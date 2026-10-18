@@ -146,6 +146,7 @@ Variables de entorno:
 | `NEXTCART_MANIFEST_PATH` | Ruta del manifiesto (opcional; por defecto junto al modelo) |
 | `NEXTCART_ADMIN_TOKEN` | Habilita y protege `POST /v1/admin/reload-model` |
 | `NEXTCART_EVENTS_PATH` | Ruta del log de eventos (default `logs/events.jsonl`) |
+| `NEXTCART_CORS_ORIGINS` | Orígenes CORS permitidos, separados por comas (default: Vite en `localhost:5173`/`4173`) |
 
 ## 7. Probar los endpoints con curl
 
@@ -248,4 +249,6 @@ nextcart-agent/
 `auditoría local` → `entrenamiento local` → `artefactos + manifiesto`
 → `backend` (solo carga y sirve, nunca entrena). Los tests livianos
 (`pytest -q`, 37 tests, segundos) cubren esquemas, inferencia, contratos
-HTTP y pipeline completo sobre un fixture pequeño.
+HTTP y pipeline completo sobre un fixture pequeño. El frontend además
+tiene una suite E2E con Playwright (`frontend/e2e`, `pnpm test:e2e`) que
+corre contra el backend real; CI en `.github/workflows/ci.yml`.

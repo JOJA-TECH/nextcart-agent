@@ -72,27 +72,46 @@ Python 3.14 + uv, Node 24 + pnpm): `/health` con modelo cargado,
 `POST /v1/recommendations` con respuestas del modelo, ciclo
 impresión → feedback → `/v1/metrics/summary` actualizando contadores, todo a
 través del proxy de `pnpm dev`, y con CORS verificado por URL directa.
-`pnpm build` compila sin errores (incluida la resolución del alias `@/` en
-Windows).
+`pnpm build` compila sin errores (alias `@/` incluido en Windows). La suite
+automatizada de la sección anterior queda en 8/8 contra el stack real.
 
-## Pruebas T01–T12
+## Pruebas automatizadas (Playwright)
 
-Las pruebas se ejecutan **manualmente contra el backend real** desde el panel «Diagnóstico y guía T01–T12» de la interfaz. No se usan MSW ni mocks de red en la aplicación. Las pruebas automatizadas quedan pendientes y, cuando se agreguen, deben ejecutarse contra un backend de prueba real o un entorno de integración controlado.
+Suite E2E con `@playwright/test` contra el stack real, sin mocks de red:
+`pnpm test:e2e`. El `playwright.config.ts` levanta solo el dev server de
+Vite y `uvicorn` (con el modelo) cuando no están corriendo; en local
+reutiliza los ya activos. En CI corre en GitHub Actions
+(`.github/workflows/ci.yml`).
 
-Pruebas ejecutadas realmente en esta entrega (verificación visual contra respuestas HTTP reales, con un servidor que hablaba el contrato real de los endpoints):
+Cubiertas (8 tests):
 
-- T01 — Recomendación normal: tarjetas con IDs numéricos, `score`, `reason` y `source` del backend.
-- T02 — Aceptación: evento `accepted` con HTTP 202 y confirmación visible solo tras la respuesta.
-- T03 — Rechazo: evento `rejected` con HTTP 202 y etiqueta «rechazado» solo tras la respuesta.
-- T04 — No repetición: los IDs rechazados persisten en la sesión y la pantalla se mantiene estable al re-solicitar.
-- T07 — Backend degradado: badge «Backend degradado» con `model_loaded: false` y HTTP 503 con mensaje de error y reintento.
-- T08 — Solicitud inválida: HTTP 422 mostrado de forma legible con la pantalla estable.
-- T09 — Carrito vacío: `cart: []` real, `fallback: true` y advertencias del backend visibles.
-- T10/T11/T12 — Validados en su parte de interfaz (inventario deshabilitado, nota de ausencia de IA, manejo de 401/403 en el cliente).
-- Backend apagado: la interfaz muestra «Backend no disponible» y el error de conexión sin datos simulados.
-- Compilación de producción y verificación en escritorio y móvil.
+- T01 — recomendaciones reales con `model_version`, `score` y `source`.
+- T02 — aceptar: evento `accepted` con HTTP 202 y un solo voto por tarjeta.
+- T03 — rechazar: evento `rejected` con badge.
+- T04 — los IDs rechazados no se repiten: el backend los filtra en la
+  siguiente solicitud.
+- T08 — solicitud inválida: HTTP 422 mostrado de forma legible.
+- T09 — carrito vacío: `cart: []` real con `fallback: true` y warnings.
+- Backend apagado — badge «Backend no disponible» y error de conexión sin
+  datos simulados (la red se aborta a nivel de navegador).
+- T07 — modelo no cargado: badge «Backend degradado» y 503 con
+  instrucción; retransmite las respuestas reales que produce el backend
+  sin `NEXTCART_MODEL_PATH`.
 
-Pruebas pendientes (requieren el backend FastAPI real levantado con el modelo `artifacts/nextcart_model.json`): T05 (un solo candidato) y la validación de T10 con el fallback real del modelo.
+Pendientes: T05 (un solo candidato), T10 (inventario de 22935) y
+T11/T12 (notas informativas sin endpoint que invocar). El lint no está en
+CI: los componentes generados de Chakra (`src/components/ui/`) traen
+errores preexistentes del template.
+
+## Comportamiento de la interfaz
+
+- El carrito inicial dispara la consulta y cada cambio de carrito
+  re-consulta con debounce de 400 ms.
+- La sesión persiste en `localStorage` (`nextcart_session_id`): los
+  rechazados sobreviven a recargas de la página.
+- Un solo voto por tarjeta: tras aceptar/rechazar/ignorar, los botones
+  quedan deshabilitados.
+- Los botones de tarjeta tienen `aria-label` con el nombre del producto.
 
 ## Limitaciones
 
