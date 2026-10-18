@@ -26,6 +26,7 @@ boost de recompra, filtros de inventario/rechazo en inferencia). Sin LLM.
 | Evaluación offline | `src/evaluate_agent.py` | `reports/model_metrics.json`, `reports/figures/model_metrics_at_k.png` |
 | Inferencia local | `src/inference.py` | Recomendaciones demo/CLI con el modelo ya entrenado (sin reentrenar) |
 | Backend HTTP | `src/backend.py` | FastAPI con `/health`, `/v1/recommendations`, eventos y métricas |
+| Frontend de checkout | `frontend/` | React + Vite (pnpm) que consume el backend real; ver `frontend/README.md` |
 | Notebook independiente | `notebooks/nextcart_audit_train.ipynb` | Auditoría S1–S5 (más S6/S7 adaptados del proyecto de referencia `old/`), entrenamiento y evaluación, autocontenido y didáctico; escribe en `notebooks/nb_out/` |
 
 ## 2. Todo se ejecuta en el equipo local
@@ -57,11 +58,7 @@ boost de recompra, filtros de inventario/rechazo en inferencia). Sin LLM.
 ## 3. Instalación
 
 ```bash
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -e ".[dev]"                 # pyproject.toml del proyecto
-# mínimo para solo el backend:
-# pip install fastapi uvicorn pydantic
+uv sync --extra dev      # crea .venv, genera uv.lock e instala todo (pyproject.toml)
 ```
 
 ## 4. Flujo local completo (auditoría → entrenamiento → evaluación)
@@ -105,13 +102,36 @@ MAP @K para K=1,3,5,10 de `topfreq`, `cooccur` y `nextcart_final`,
 cobertura, repeat/explore, latencia offline, metodología del split
 (oficial Instacart prior→train, sin fuga) y advertencias.
 
-## 6. Backend: dependencias mínimas y arranque
+## 6. Backend y frontend: arranque para pruebas
+
+Backend (FastAPI, con `uv`):
 
 ```bash
-pip install fastapi uvicorn            # pydantic ya viene con fastapi
+# bash / Linux / macOS
 export NEXTCART_MODEL_PATH=artifacts/nextcart_model.json
-uvicorn src.backend:app --host 0.0.0.0 --port 8000
+uv run uvicorn src.backend:app --host 0.0.0.0 --port 8000
 ```
+
+```powershell
+# Windows (PowerShell)
+$env:NEXTCART_MODEL_PATH = "artifacts/nextcart_model.json"
+uv run uvicorn src.backend:app --host 127.0.0.1 --port 8000
+```
+
+Frontend (React + Vite, con `pnpm`) en otra terminal:
+
+```bash
+cd frontend
+pnpm install
+pnpm dev    # http://localhost:5173
+```
+
+Por defecto el frontend llama por rutas relativas y el **proxy de Vite**
+reenvía `/v1` y `/health` al backend (`http://localhost:8000`, configurable
+con `NEXTCART_BACKEND_URL`). Alternativa: llamar directo configurando
+`VITE_NEXTCART_API_BASE_URL` en `frontend/.env` (ver `frontend/.env.example`);
+el backend ya habilita CORS para los orígenes de Vite
+(`localhost:5173/4173`). Detalles en `frontend/README.md`.
 
 Reglas de arranque verificables en los tests: el backend **no entrena**, no
 descarga el dataset, no ejecuta el flujo y no reconstruye reglas pesadas;
@@ -202,10 +222,8 @@ backend lo advierte en `/v1/metrics/summary`.
 ```
 nextcart-agent/
 ├── README.md
-├── pyproject.toml
-├── prompt_para_agente_nextcart.md   # especificación original
-├── data/README.md                   # dónde dejar los CSV (dataset/ autodetect)
-├── dataset/                         # CSV de Instacart (no versionados)
+├── pyproject.toml          # dependencias del proyecto (uv genera uv.lock)
+├── data/README.md          # dónde dejar los CSV del dataset Instacart
 ├── src/
 │   ├── config.py        # rutas, defaults, semilla
 │   ├── schemas.py       # contratos Pydantic (validaciones)
@@ -215,13 +233,14 @@ nextcart-agent/
 │   ├── inference.py     # carga del artefacto (sin reentrenar) + CLI demo
 │   ├── artifacts.py     # validación/verificación de artefacto y manifiesto
 │   ├── storage.py       # JSON atómico, JSONL, hash, timers
-│   └── backend.py       # FastAPI: /health, /v1/*, eventos y métricas
+│   └── backend.py       # FastAPI: /health, /v1/*, eventos, métricas y CORS
+├── tests/               # fixtures mini_dataset + 37 tests (sin red)
+├── frontend/            # React + Vite + Chakra (pnpm); ver frontend/README.md
+├── notebooks/nextcart_audit_train.ipynb  # notebook independiente
 ├── reports/             # audit_results.json, dataset_audit.md,
 │                        # model_metrics.json, figures/*  (ver README)
 ├── artifacts/           # nextcart_model.json + manifest (ver README)
-├── logs/events.jsonl    # eventos del backend
-├── notebooks/nextcart_audit_train.ipynb  # notebook independiente
-└── tests/               # fixtures mini_dataset + 37 tests (sin red)
+└── logs/events.jsonl    # eventos del backend (se crea al correr)
 ```
 
 ## 12. Flujo resumido (lo que explica este README)
