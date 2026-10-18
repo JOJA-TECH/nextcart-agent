@@ -107,15 +107,23 @@ def create_app(
 
     app = FastAPI(title="NEXTCART-AGENT", version="0.1.0", lifespan=lifespan)
     # CORS para el frontend en desarrollo (Vite dev :5173 y preview :4173);
-    # en producción también se puede usar el proxy inverso sin CORS.
+    # configurable con NEXTCART_CORS_ORIGINS (separada por comas) para otros
+    # despliegues. En producción también se puede usar el proxy inverso.
+    default_origins = [
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://localhost:4173",
+        "http://127.0.0.1:4173",
+    ]
+    raw_origins = os.environ.get("NEXTCART_CORS_ORIGINS")
+    cors_origins = (
+        [origin.strip() for origin in raw_origins.split(",") if origin.strip()]
+        if raw_origins
+        else default_origins
+    )
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=[
-            "http://localhost:5173",
-            "http://127.0.0.1:5173",
-            "http://localhost:4173",
-            "http://127.0.0.1:4173",
-        ],
+        allow_origins=cors_origins,
         allow_methods=["*"],
         allow_headers=["*"],
     )
