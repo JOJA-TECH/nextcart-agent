@@ -1,10 +1,11 @@
 import { LoadingState, EmptyState, ErrorState } from "@/shared/components/States"
 import type { RequestStatus } from "../hooks/useRecommendations"
 import { RecommendationList } from "./RecommendationList"
-import type { Recommendation } from "@/shared/api/contracts"
+import type { NextCartClient, Recommendation } from "@/shared/api/contracts"
 import { Alert } from "@chakra-ui/react"
 
 export interface RecommendationStateProps {
+  client: NextCartClient
   status: RequestStatus
   error: string | null
   recommendations: Recommendation[]
@@ -20,6 +21,7 @@ export interface RecommendationStateProps {
 
 export function RecommendationState(props: RecommendationStateProps) {
   const {
+    client,
     status,
     error,
     recommendations,
@@ -57,6 +59,7 @@ export function RecommendationState(props: RecommendationStateProps) {
 
   return (
     <RecommendationList
+      client={client}
       recommendations={recommendations}
       inventory={inventory}
       acceptedIds={acceptedIds}

@@ -14,33 +14,47 @@ test("T01: recomendaciones reales con model_version, score y source", async ({
   await expect(page.getByText(/score \d+\.\d+/).first()).toBeVisible()
 })
 
-test("T02: aceptar envía accepted y confirma HTTP 202", async ({ page }) => {
+test("T02: aceptar envía accepted, agrega al carrito y retira la tarjeta", async ({
+  page,
+}) => {
   await page.goto("/")
-  // Primera tarjeta habilitada (22935 puede venir sin inventario y deshabilitada).
   const accept = page
     .getByRole("button", { name: /^Agregar / })
     .and(page.locator("button:not([disabled])"))
     .first()
   await expect(accept).toBeEnabled({ timeout: 15_000 })
+  const acceptedLabel = await accept.getAttribute("aria-label")
+  expect(acceptedLabel, "aria-label de la tarjeta aceptada").toBeTruthy()
   await accept.click()
   await expect(
     page.getByText(/aceptado — evento «accepted» confirmado por el backend/),
   ).toBeVisible()
-  await expect(page.getByText("aceptado", { exact: true }).first()).toBeVisible()
-  // P0: un solo voto por producto — el botón queda deshabilitado.
+  // La tarjeta aceptada desaparece del widget…
   await expect(
-    page.getByRole("button", { name: /^Agregar / }).first(),
-  ).toBeDisabled()
+    page.getByRole("button", { name: acceptedLabel!, exact: true }),
+  ).toHaveCount(0)
+  // …y el producto entra al carrito real (2 iniciales + 1 aceptado).
+  await expect(
+    page.getByRole("button", { name: /^Quitar producto \d+ del carrito/ }),
+  ).toHaveCount(3)
 })
 
-test("T03: rechazar envía rejected y muestra el badge", async ({ page }) => {
+test("T03: rechazar envía rejected y retira la tarjeta", async ({ page }) => {
   await page.goto("/")
   const enabledReject = page
     .getByRole("button", { name: /^No me interesa / })
     .and(page.locator("button:not([disabled])"))
   await expect(enabledReject.nth(1)).toBeEnabled({ timeout: 15_000 })
+  const rejectedLabel = await enabledReject.nth(1).getAttribute("aria-label")
+  expect(rejectedLabel, "aria-label de la tarjeta rechazada").toBeTruthy()
   await enabledReject.nth(1).click()
-  await expect(page.getByText("rechazado", { exact: true }).first()).toBeVisible()
+  // La tarjeta rechazada desaparece y el widget consulta reemplazos.
+  await expect(
+    page.getByRole("button", { name: rejectedLabel!, exact: true }),
+  ).toHaveCount(0)
+  await expect(page.getByText(/score \d+\.\d+/).first()).toBeVisible({
+    timeout: 15_000,
+  })
 })
 
 test("T04: los IDs rechazados no se repiten al re-solicitar", async ({
@@ -56,7 +70,6 @@ test("T04: los IDs rechazados no se repiten al re-solicitar", async ({
   const rejectedId = idText?.match(/ID (\d+)/)?.[1]
   expect(rejectedId, "ID de la tarjeta rechazada").toBeTruthy()
   await enabledReject.nth(1).click()
-  await expect(page.getByText("rechazado", { exact: true }).first()).toBeVisible()
   await page.getByRole("button", { name: "Pedir recomendaciones" }).click()
   await expect(page.getByText(/score \d+\.\d+/).first()).toBeVisible()
   // El backend filtra los rechazados: el producto no vuelve en la nueva respuesta.

@@ -39,6 +39,10 @@ La URL del backend se resuelve así:
 
 - `GET /health`
 - `POST /v1/recommendations`
+- `GET /v1/catalog/products` (búsqueda, filtros por departamento/pasillo y paginación)
+- `GET /v1/catalog/products/{id}` (resolución de IDs de recomendaciones/carrito)
+- `GET /v1/catalog/departments`
+- `GET /v1/catalog/aisles`
 - `POST /v1/events/impression`
 - `POST /v1/events/feedback`
 - `GET /v1/metrics/summary`
@@ -47,8 +51,11 @@ No se usa `/v1/admin/reload-model` (requiere token administrativo y no es operac
 
 ## Datos reales vs. datos de presentación
 
-- **Reales del backend**: los IDs numéricos del dataset Instacart (por ejemplo `24852`, `13176`, `21137`), `score`, `reason`, `source`, `fallback`, `warnings`, `model_version`, `latency_ms` y las métricas de `/v1/metrics/summary`.
-- **De presentación (`catálogo-demo`)**: nombres, precios, categorías e imágenes. Viven en `src/shared/catalog-demo.ts` y están marcados con la etiqueta `catálogo-demo` en la interfaz. No provienen del dataset Instacart ni del modelo.
+- **Reales del backend**: los IDs numéricos del dataset Instacart (por ejemplo `24852`, `13176`, `21137`), los nombres del catálogo (`product_name`), departamentos y pasillos de `/v1/catalog` (SQLite construido con los CSV del dataset), `score`, `reason`, `source`, `fallback`, `warnings`, `model_version`, `latency_ms` y las métricas de `/v1/metrics/summary`.
+- **De presentación**: los **precios** y el total del carrito. El dataset Instacart no tiene precios: el backend asigna valores de demostración **deterministas** en COP (mismo `product_id` ⇒ mismo precio siempre; semilla configurable con `python -m src.catalog_db build --price-seed …`).
+- **Imágenes**: el dataset no incluye imágenes; todas las tarjetas usan el placeholder de canasta de comida (`ProductThumb` con `LuShoppingBasket`).
+
+El navegador de catálogo (`src/features/catalog/`) busca productos reales con debounce, filtra por departamento/pasillo, pagina de a 12 y agrega al carrito; un cache compartido por módulo (`catalogStore.ts`) resuelve cada `product_id` contra `/v1/catalog/products/{id}` una sola vez por sesión de página.
 
 ## Nota sobre IA
 
@@ -86,8 +93,10 @@ reutiliza los ya activos. En CI corre en GitHub Actions
 Cubiertas (8 tests):
 
 - T01 — recomendaciones reales con `model_version`, `score` y `source`.
-- T02 — aceptar: evento `accepted` con HTTP 202 y un solo voto por tarjeta.
-- T03 — rechazar: evento `rejected` con badge.
+- T02 — aceptar: evento `accepted` con HTTP 202, el producto entra al
+  carrito real y la tarjeta aceptada se retira del widget.
+- T03 — rechazar: evento `rejected` con la tarjeta retirada y reemplazos
+  pedidos al backend.
 - T04 — los IDs rechazados no se repiten: el backend los filtra en la
   siguiente solicitud.
 - T08 — solicitud inválida: HTTP 422 mostrado de forma legible.

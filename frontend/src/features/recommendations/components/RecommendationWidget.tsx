@@ -12,17 +12,21 @@ import {
 } from "@chakra-ui/react"
 import { LuRefreshCw, LuSparkles } from "react-icons/lu"
 import { NO_AI_NOTE } from "@/shared/ai/no-ai"
-import { DEMO_DATA_NOTE } from "@/shared/catalog-demo"
+import { CATALOG_DATA_NOTE } from "@/shared/catalog/catalog-notes"
 import type {
+  NextCartClient,
   RecommendationResponse,
 } from "@/shared/api/contracts"
 import type { UseRecommendationsResult } from "../hooks/useRecommendations"
 import { RecommendationState, FeedbackErrorAlert } from "./RecommendationState"
 
 export interface RecommendationWidgetProps {
+  client: NextCartClient
   session: UseRecommendationsResult
   inventory: Record<string, boolean>
   inventoryOverride: Record<string, boolean> | null
+  /** Al aceptar una recomendación: agrega el producto al carrito real. */
+  onAcceptToCart?: (productId: number) => void
   onRetry: () => void
   onInvalidRequest: () => void
 }
@@ -48,32 +52,67 @@ function backendBadge(response: RecommendationResponse) {
 }
 
 export function RecommendationWidget({
+  client,
   session,
   inventory,
   inventoryOverride,
+  onAcceptToCart,
   onRetry,
   onInvalidRequest,
 }: RecommendationWidgetProps) {
   const [busyProductId, setBusyProductId] = useState<number | null>(null)
+  // Tarjetas votadas que ya no se muestran: aceptadas entran al carrito,
+  // rechazadas/ignoradas se retiran y el backend las reemplaza en la próxima
+  // consulta (el payload envía rejected). El registro vive junto a la
+  // respuesta a la que pertenece: una respuesta nueva lo limpia solo.
+  const [dismissed, setDismissed] = useState<{
+    response: RecommendationResponse
+    ids: number[]
+  } | null>(null)
+
+  const dismissedIds =
+    dismissed && session.response === dismissed.response ? dismissed.ids : []
+
+  const dismiss = (productId: number) => {
+    const response = session.response
+    if (!response) return
+    setDismissed((prev) => {
+      const base = prev?.response === response ? prev.ids : []
+      return base.includes(productId)
+        ? prev
+        : { response, ids: [...base, productId] }
+    })
+  }
+
   const handleAccept = async (productId: number) => {
     setBusyProductId(productId)
     const ok = await session.sendFeedback(productId, "accepted")
     setBusyProductId(null)
-    void ok
+    if (ok) {
+      onAcceptToCart?.(productId)
+      dismiss(productId)
+    }
   }
 
   const handleReject = async (productId: number) => {
     setBusyProductId(productId)
     const ok = await session.sendFeedback(productId, "rejected")
     setBusyProductId(null)
-    void ok
+    if (ok) {
+      dismiss(productId)
+      // El backend ya registró el rechazo: pide los siguientes candidatos.
+      void session.fetchRecommendations()
+    }
   }
 
   const handleIgnore = async (productId: number) => {
     setBusyProductId(productId)
     const ok = await session.sendFeedback(productId, "ignored")
     setBusyProductId(null)
-    void ok
+    if (ok) {
+      dismiss(productId)
+      void session.fetchRecommendations()
+    }
   }
 
   const requestRecommendations = () => {
@@ -110,7 +149,7 @@ export function RecommendationWidget({
         </HStack>
 
         <Text textStyle="xs" color="fg.muted">
-          {DEMO_DATA_NOTE}
+          {CATALOG_DATA_NOTE}
         </Text>
 
         {warnings.length > 0 && (
@@ -134,9 +173,12 @@ export function RecommendationWidget({
         <Separator />
 
         <RecommendationState
+          client={client}
           status={session.status}
           error={session.error}
-          recommendations={session.response?.recommendations ?? []}
+          recommendations={(
+            session.response?.recommendations ?? []
+          ).filter((rec) => !dismissedIds.includes(rec.product_id))}
           inventory={inventoryOverride ?? inventory}
           acceptedIds={session.acceptedIds}
           rejectedIds={session.rejectedIds}

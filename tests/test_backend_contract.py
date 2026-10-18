@@ -15,7 +15,9 @@ from src.backend import create_app
 def client_with_model(tiny_model_path: Path, tmp_path: Path):
     app = create_app(model_path=str(tiny_model_path),
                      events_path=tmp_path / "events.jsonl",
-                     admin_token="tok-secreto")
+                     admin_token="tok-secreto",
+                     catalog_db_path=tmp_path / "catalog.db",
+                     catalog_data_dir=tmp_path / "sin-dataset")
     with TestClient(app) as c:
         yield c, tmp_path
 
@@ -23,7 +25,9 @@ def client_with_model(tiny_model_path: Path, tmp_path: Path):
 @pytest.fixture()
 def client_without_model(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     monkeypatch.delenv("NEXTCART_MODEL_PATH", raising=False)
-    app = create_app(model_path=None, events_path=tmp_path / "events.jsonl")
+    app = create_app(model_path=None, events_path=tmp_path / "events.jsonl",
+                     catalog_db_path=tmp_path / "catalog.db",
+                     catalog_data_dir=tmp_path / "sin-dataset")
     with TestClient(app) as c:
         yield c
 
@@ -34,7 +38,8 @@ def test_health_with_model(client_with_model):
     assert r.status_code == 200
     body = r.json()
     assert body == {"status": "ok", "model_loaded": True,
-                    "model_version": "test-0.0.1", "error": None}
+                    "model_version": "test-0.0.1", "error": None,
+                    "catalog_loaded": False}
 
 
 def test_health_without_model_reports_false(client_without_model):

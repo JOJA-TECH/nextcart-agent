@@ -3,6 +3,51 @@ export interface HealthResponse {
   model_loaded: boolean
   model_version: string | null
   error: string | null
+  catalog_loaded?: boolean
+}
+
+/**
+ * Catálogo servido por el backend (/v1/catalog/*) desde SQLite construido
+ * con los CSV del dataset Instacart. Los precios son valores de demostración
+ * deterministas en COP (mismo product_id ⇒ mismo precio siempre).
+ */
+export interface CatalogProduct {
+  product_id: number
+  product_name: string
+  aisle_id: number
+  department_id: number
+  price: number
+  currency: "COP"
+  aisle: string | null
+  department: string | null
+}
+
+export interface CatalogPage {
+  total: number
+  limit: number
+  offset: number
+  items: CatalogProduct[]
+}
+
+export interface CatalogDepartment {
+  department_id: number
+  department: string
+  product_count: number
+}
+
+export interface CatalogAisle {
+  aisle_id: number
+  aisle: string
+  department_id: number | null
+  product_count: number
+}
+
+export interface CatalogProductsQuery {
+  search?: string
+  department_id?: number
+  aisle_id?: number
+  limit?: number
+  offset?: number
 }
 
 export type NavigationType = "view" | "reject" | "cart_add"
@@ -81,4 +126,8 @@ export interface NextCartClient {
   impression(event: ImpressionEvent): Promise<void>
   feedback(event: FeedbackEvent): Promise<void>
   metricsSummary(): Promise<MetricsSummary>
+  catalogProducts(query?: CatalogProductsQuery): Promise<CatalogPage>
+  catalogDepartments(): Promise<CatalogDepartment[]>
+  catalogAisles(departmentId?: number): Promise<CatalogAisle[]>
+  catalogProduct(productId: number): Promise<CatalogProduct>
 }

@@ -1,9 +1,12 @@
-import { Badge, Button, Card, HStack, Image, Stack, Text } from "@chakra-ui/react"
+import { Badge, Button, Card, HStack, Stack, Text } from "@chakra-ui/react"
 import { LuMinus, LuShoppingCart, LuTrash2 } from "react-icons/lu"
-import { CATALOG_DEMO_TAG, lookupDemoProduct } from "@/shared/catalog-demo"
+import type { NextCartClient } from "@/shared/api/contracts"
+import { ProductFallbackThumb, ProductThumb } from "@/shared/components/ProductThumb"
+import { useCatalogProduct } from "@/features/catalog/catalogStore"
 import { formatCurrency } from "@/shared/utils/format"
 
 export interface RecommendationCardProps {
+  client: NextCartClient
   productId: number
   score: number
   reason: string
@@ -20,6 +23,7 @@ export interface RecommendationCardProps {
 
 export function RecommendationCard(props: RecommendationCardProps) {
   const {
+    client,
     productId,
     score,
     reason,
@@ -34,7 +38,10 @@ export function RecommendationCard(props: RecommendationCardProps) {
     onIgnore,
   } = props
 
-  const product = lookupDemoProduct(productId)
+  // Nombre/precio/categoría del catálogo real (/v1/catalog, dataset Instacart).
+  const { product } = useCatalogProduct(client, productId)
+  const name = product?.product_name ?? `Producto #${productId}`
+  const category = product?.aisle ?? product?.department ?? null
   const unavailable = !inventoryAvailable
   // Un solo voto por producto: evita los badges aceptado+rechazado a la vez.
   const voted = accepted || rejected || ignored
@@ -47,39 +54,24 @@ export function RecommendationCard(props: RecommendationCardProps) {
     >
       <Card.Body gap="3" minW={{ base: "full", sm: "56" }}>
         <HStack align="start" gap="3">
-          {product.image ? (
-            <Image
-              src={product.image}
-              alt={product.name}
-              boxSize="14"
-              rounded="md"
-              objectFit="cover"
-              bg="bg.muted"
-              flexShrink={0}
-            />
+          {product ? (
+            <ProductThumb size="md" muted={unavailable} />
           ) : (
-            <Stack
-              boxSize="14"
-              rounded="md"
-              bg="bg.muted"
-              align="center"
-              justify="center"
-              flexShrink={0}
-            >
-              <Text textStyle="lg" fontWeight="bold" color="fg.muted">
-                {String(productId).slice(-2)}
-              </Text>
-            </Stack>
+            <ProductFallbackThumb label={String(productId).slice(-2)} boxSize={56} />
           )}
           <Stack gap="0.5" minW="0">
             <Text fontWeight="medium" lineClamp={2}>
-              {product.name}
+              {name}
             </Text>
-            <Text textStyle="xs" color="fg.muted">
-              ID {productId} · {product.category} · {formatCurrency(product.price, product.currency)}
+            <Text textStyle="xs" color="fg.muted" minW="0">
+              ID {productId}
+              {category ? ` · ${category}` : ""}
+              {product
+                ? ` · ${formatCurrency(product.price, product.currency)}`
+                : ""}
             </Text>
-            <Badge colorPalette="purple" variant="subtle" alignSelf="flex-start">
-              {CATALOG_DEMO_TAG}
+            <Badge colorPalette="blue" variant="subtle" alignSelf="flex-start">
+              catálogo Instacart
             </Badge>
           </Stack>
         </HStack>
@@ -117,7 +109,7 @@ export function RecommendationCard(props: RecommendationCardProps) {
             onClick={onAccept}
             loading={busy}
             disabled={unavailable || voted}
-            aria-label={`Agregar ${product.name} al carrito`}
+            aria-label={`Agregar ${name} al carrito`}
           >
             <LuShoppingCart />
             Agregar
@@ -128,7 +120,7 @@ export function RecommendationCard(props: RecommendationCardProps) {
             variant="outline"
             onClick={onReject}
             disabled={busy || voted}
-            aria-label={`No me interesa ${product.name}`}
+            aria-label={`No me interesa ${name}`}
           >
             <LuTrash2 />
             No me interesa
@@ -139,7 +131,7 @@ export function RecommendationCard(props: RecommendationCardProps) {
             color="fg.muted"
             onClick={onIgnore}
             disabled={busy || voted}
-            aria-label={`Registrar ${product.name} como ignorada`}
+            aria-label={`Registrar ${name} como ignorada`}
           >
             <LuMinus />
             Registrar ignorada

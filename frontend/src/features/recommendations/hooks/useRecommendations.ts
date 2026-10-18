@@ -46,6 +46,9 @@ export function useRecommendations(
   const [acceptedNow, setAcceptedNow] = useState<number | null>(null)
   const impressionSentRef = useRef<RecommendationResponse | null>(null)
   const hasFetchedRef = useRef(false)
+  // Ref siempre fresco: una re-consulta disparada justo después de votar
+  // debe incluir el rechazo recién registrado.
+  const rejectedRef = useRef(rejectedIds)
 
   const effectiveCart = useMemo(() => {
     if (cart.length > 0) return cart
@@ -71,7 +74,7 @@ export function useRecommendations(
           cart: options?.cartOverride ?? effectiveCart,
           navigation: [] as { type: "view"; product_id: number }[],
           recent_history: [effectiveCart] as number[][],
-          rejected: rejectedIds,
+          rejected: rejectedRef.current,
           inventory:
             options?.inventoryOverride ??
             Object.fromEntries(
@@ -92,7 +95,7 @@ export function useRecommendations(
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [client, sessionId, effectiveCart, rejectedIds, onBackendEvent],
+    [client, sessionId, effectiveCart, onBackendEvent],
   )
 
   const sendImpression = useCallback(
@@ -138,9 +141,11 @@ export function useRecommendations(
           )
           setAcceptedNow(productId)
         } else if (kind === "rejected") {
-          setRejectedIds((prev) =>
-            prev.includes(productId) ? prev : [...prev, productId],
-          )
+          setRejectedIds((prev) => {
+            const next = prev.includes(productId) ? prev : [...prev, productId]
+            rejectedRef.current = next
+            return next
+          })
           setAcceptedNow(null)
         } else {
           setIgnoredIds((prev) =>

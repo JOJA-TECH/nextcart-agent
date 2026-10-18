@@ -1,4 +1,9 @@
 import type {
+  CatalogAisle,
+  CatalogDepartment,
+  CatalogPage,
+  CatalogProduct,
+  CatalogProductsQuery,
   FeedbackEvent,
   HealthResponse,
   ImpressionEvent,
@@ -114,6 +119,22 @@ export class InstrumentedNextCartClient implements NextCartClient {
       })
       throw error
     }
+  }
+
+  catalogProducts(query: CatalogProductsQuery = {}): Promise<CatalogPage> {
+    return this.inner.catalogProducts(query)
+  }
+
+  catalogDepartments(): Promise<CatalogDepartment[]> {
+    return this.inner.catalogDepartments()
+  }
+
+  catalogAisles(departmentId?: number): Promise<CatalogAisle[]> {
+    return this.inner.catalogAisles(departmentId)
+  }
+
+  catalogProduct(productId: number): Promise<CatalogProduct> {
+    return this.inner.catalogProduct(productId)
   }
 }
 

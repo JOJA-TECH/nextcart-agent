@@ -25,7 +25,8 @@ boost de recompra, filtros de inventario/rechazo en inferencia). Sin LLM.
 | Entrenamiento | `src/train_agent.py` | `artifacts/nextcart_model.json`, `artifacts/artifact_manifest.json` |
 | Evaluación offline | `src/evaluate_agent.py` | `reports/model_metrics.json`, `reports/figures/model_metrics_at_k.png` |
 | Inferencia local | `src/inference.py` | Recomendaciones demo/CLI con el modelo ya entrenado (sin reentrenar) |
-| Backend HTTP | `src/backend.py` | FastAPI con `/health`, `/v1/recommendations`, eventos y métricas |
+| Backend HTTP | `src/backend.py` | FastAPI con `/health`, `/v1/recommendations`, `/v1/catalog/*`, eventos y métricas |
+| Catálogo SQLite | `src/catalog_db.py` | `data/catalog.db` (productos/pasillos/departamentos + precios demo deterministas) |
 | Frontend de checkout | `frontend/` | React + Vite (pnpm) que consume el backend real; ver `frontend/README.md` |
 | Notebook independiente | `notebooks/nextcart_audit_train.ipynb` | Auditoría S1–S5 (más S6/S7 adaptados del proyecto de referencia `old/`), entrenamiento y evaluación, autocontenido y didáctico; escribe en `notebooks/nb_out/` |
 
@@ -143,6 +144,8 @@ Variables de entorno:
 | Variable | Uso |
 |---|---|
 | `NEXTCART_MODEL_PATH` | Ruta del artefacto del modelo (obligatoria para servir) |
+| `NEXTCART_DATA_DIR` | Directorio de los CSV de Instacart para construir el catálogo (default `data/`) |
+| `NEXTCART_CATALOG_DB_PATH` | Ruta de la BD SQLite del catálogo (default `data/catalog.db`; se construye sola si falta) |
 | `NEXTCART_MANIFEST_PATH` | Ruta del manifiesto (opcional; por defecto junto al modelo) |
 | `NEXTCART_ADMIN_TOKEN` | Habilita y protege `POST /v1/admin/reload-model` |
 | `NEXTCART_EVENTS_PATH` | Ruta del log de eventos (default `logs/events.jsonl`) |
@@ -174,10 +177,17 @@ curl -s -X POST localhost:8000/v1/events/impression \
 curl -s -X POST localhost:8000/v1/events/feedback \
   -H 'Content-Type: application/json' \
   -d '{"session_id":"sess-001","product_id":21137,"event":"accepted",
-       "recommendation_ids":[21137,47209]}'
+       "recommendation_ids":[21137,47209]}'# métricas observadas
 
-# métricas observadas
 curl -s localhost:8000/v1/metrics/summary
+
+# catálogo del dataset (SQLite, precios demo deterministas COP)
+
+curl -s "localhost:8000/v1/catalog/products?search=banana&department_id=4&limit=3"
+
+curl -s localhost:8000/v1/catalog/products/24852
+
+curl -s localhost:8000/v1/catalog/departments
 
 # recarga del modelo ya entrenado (opcional, protegido)
 export NEXTCART_ADMIN_TOKEN=dev-token
@@ -211,7 +221,10 @@ backend lo advierte en `/v1/metrics/summary`.
 
 - **Inventario:** no hay stock real; el filtro de agotados solo se puede
   aplicar en tiempo de inferencia con datos en vivo de la tienda.
-- **Precio:** sin precios ni promociones; no se puede optimizar margen.
+- **Precio:** sin precios ni promociones; no se puede optimizar margen. El
+  catálogo HTTP sí sirve **precios de demostración deterministas** en COP
+  (`mismo product_id ⇒ mismo precio`; hash con semilla fija) para la
+  interfaz, marcados como demo; no son precios reales.
 - **Posición del widget:** sin impresiones ni posición; no hay señal de
   exposición ni de vertical-bias.
 - **Aceptación:** sin feedback de usuarios; la métrica comercial solo con A/B.
@@ -228,6 +241,7 @@ nextcart-agent/
 ├── src/
 │   ├── config.py        # rutas, defaults, semilla
 │   ├── schemas.py       # contratos Pydantic (validaciones)
+│   ├── catalog_db.py    # catálogo SQLite del dataset + precios demo deterministas
 │   ├── audit_dataset.py # auditoría S1–S5 con DuckDB + figuras + informe
 │   ├── train_agent.py   # modelo coocurrencia+frecuencia; manifiesto
 │   ├── evaluate_agent.py# offline eval @K, cobertura, repeat/explore, latencia

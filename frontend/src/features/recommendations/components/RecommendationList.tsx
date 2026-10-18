@@ -1,8 +1,9 @@
 import { SimpleGrid } from "@chakra-ui/react"
-import type { Recommendation } from "@/shared/api/contracts"
+import type { NextCartClient, Recommendation } from "@/shared/api/contracts"
 import { RecommendationCard } from "./RecommendationCard"
 
 export interface RecommendationListProps {
+  client: NextCartClient
   recommendations: Recommendation[]
   inventory: Record<string, boolean>
   acceptedIds: number[]
@@ -16,6 +17,7 @@ export interface RecommendationListProps {
 
 export function RecommendationList(props: RecommendationListProps) {
   const {
+    client,
     recommendations,
     inventory,
     acceptedIds,
@@ -32,6 +34,7 @@ export function RecommendationList(props: RecommendationListProps) {
       {recommendations.map((rec) => (
         <RecommendationCard
           key={rec.product_id}
+          client={client}
           productId={rec.product_id}
           score={rec.score}
           reason={rec.reason}

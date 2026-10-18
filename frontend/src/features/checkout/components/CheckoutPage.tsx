@@ -4,8 +4,9 @@ import type { NextCartClient } from "@/shared/api/contracts"
 import { CartSummary } from "./CartSummary"
 import { CheckoutHeader } from "./CheckoutHeader"
 import { RecommendationWidget } from "@/features/recommendations/components/RecommendationWidget"
+import { CatalogBrowser } from "@/features/catalog/components/CatalogBrowser"
 import { useRecommendations } from "@/features/recommendations/hooks/useRecommendations"
-import { DEMO_DATA_NOTE } from "@/shared/catalog-demo"
+import { CATALOG_DATA_NOTE } from "@/shared/catalog/catalog-notes"
 import { NO_AI_NOTE } from "@/shared/ai/no-ai"
 import { useHealthPoll } from "@/features/diagnostics/hooks/useHealthPoll"
 
@@ -108,7 +109,7 @@ export function CheckoutPage({ client }: CheckoutPageProps) {
           </HStack>
 
           <Text textStyle="xs" color="fg.muted">
-            {DEMO_DATA_NOTE}
+            {CATALOG_DATA_NOTE}
           </Text>
 
           <Grid
@@ -118,7 +119,9 @@ export function CheckoutPage({ client }: CheckoutPageProps) {
           >
             <VStack align="stretch" gap="5">
               <RecommendationWidget
+                client={client}
                 session={recommendations}
+                onAcceptToCart={addToCart}
                 inventory={BASE_INVENTORY}
                 inventoryOverride={inventoryOverride}
                 onRetry={() => {
@@ -130,6 +133,14 @@ export function CheckoutPage({ client }: CheckoutPageProps) {
                 }}
               />
 
+              <Box bg="bg" rounded="xl" borderWidth="1px" borderColor="border" p="5" shadow="sm">
+                <CatalogBrowser
+                  client={client}
+                  cart={cart}
+                  onAddProduct={addToCart}
+                />
+              </Box>
+
               <Box display={{ base: "block", lg: "none" }}>
                 <Suspense fallback={panelFallback}>
                   <MetricsSummaryPanel client={client} refreshNonce={metricsNonce} />
@@ -140,9 +151,9 @@ export function CheckoutPage({ client }: CheckoutPageProps) {
             <VStack align="stretch" gap="5">
               <Box bg="bg" rounded="xl" borderWidth="1px" borderColor="border" p="5" shadow="sm">
                 <CartSummary
+                  client={client}
                   cart={cart}
                   onRemove={removeFromCart}
-                  onAddProduct={addToCart}
                 />
               </Box>
 

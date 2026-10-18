@@ -1,4 +1,9 @@
 import type {
+  CatalogAisle,
+  CatalogDepartment,
+  CatalogPage,
+  CatalogProduct,
+  CatalogProductsQuery,
   FeedbackEvent,
   HealthResponse,
   ImpressionEvent,
@@ -117,5 +122,39 @@ export class HttpNextCartClient implements NextCartClient {
 
   metricsSummary(): Promise<MetricsSummary> {
     return request<MetricsSummary>("/v1/metrics/summary")
+  }
+
+  catalogProducts(query: CatalogProductsQuery = {}): Promise<CatalogPage> {
+    const params = new URLSearchParams()
+    if (query.search?.trim()) params.set("search", query.search.trim())
+    if (query.department_id !== undefined) {
+      params.set("department_id", String(query.department_id))
+    }
+    if (query.aisle_id !== undefined) {
+      params.set("aisle_id", String(query.aisle_id))
+    }
+    if (query.limit !== undefined) params.set("limit", String(query.limit))
+    if (query.offset !== undefined) params.set("offset", String(query.offset))
+    const qs = params.toString()
+    return request<CatalogPage>(`/v1/catalog/products${qs ? `?${qs}` : ""}`)
+  }
+
+  async catalogDepartments(): Promise<CatalogDepartment[]> {
+    const body = await request<{ items: CatalogDepartment[] }>(
+      "/v1/catalog/departments",
+    )
+    return body.items
+  }
+
+  async catalogAisles(departmentId?: number): Promise<CatalogAisle[]> {
+    const qs = departmentId !== undefined ? `?department_id=${departmentId}` : ""
+    const body = await request<{ items: CatalogAisle[] }>(`/v1/catalog/aisles${qs}`)
+    return body.items
+  }
+
+  catalogProduct(productId: number): Promise<CatalogProduct> {
+    return request<CatalogProduct>(
+      `/v1/catalog/products/${encodeURIComponent(productId)}`,
+    )
   }
 }

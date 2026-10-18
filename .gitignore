@@ -74,3 +74,6 @@ logs/
 notebooks/_build_notebook.py
 .spill
 notebooks/nb_out/nextcart_model.json
+
+# Datos pesados que no deben subirse a GitHub
+data/*.csv
