@@ -65,7 +65,6 @@ desktop.ini
 logs/
 
 # Local data
-*.db
 *.sqlite
 *.sqlite3
 .data/
