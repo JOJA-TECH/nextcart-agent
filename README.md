@@ -25,7 +25,9 @@ boost de recompra, filtros de inventario/rechazo en inferencia). Sin LLM.
 | Entrenamiento | `src/train_agent.py` | `artifacts/nextcart_model.json`, `artifacts/artifact_manifest.json` |
 | Evaluación offline | `src/evaluate_agent.py` | `reports/model_metrics.json`, `reports/figures/model_metrics_at_k.png` |
 | Inferencia local | `src/inference.py` | Recomendaciones demo/CLI con el modelo ya entrenado (sin reentrenar) |
-| Backend HTTP | `src/backend.py` | FastAPI con `/health`, `/v1/recommendations`, eventos y métricas |
+| Backend HTTP | `src/backend.py` | FastAPI con `/health`, `/v1/recommendations`, `/v1/catalog/*`, eventos y métricas |
+| Catálogo SQLite | `src/catalog_db.py` | `data/catalog.db` (productos/pasillos/departamentos + precios demo deterministas) |
+| Frontend de checkout | `frontend/` | React + Vite (pnpm) que consume el backend real; ver `frontend/README.md` |
 | Notebook independiente | `notebooks/nextcart_audit_train.ipynb` | Auditoría S1–S5 (más S6/S7 adaptados del proyecto de referencia `old/`), entrenamiento y evaluación, autocontenido y didáctico; escribe en `notebooks/nb_out/` |
 
 ## 2. Todo se ejecuta en el equipo local
@@ -57,11 +59,7 @@ boost de recompra, filtros de inventario/rechazo en inferencia). Sin LLM.
 ## 3. Instalación
 
 ```bash
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -e ".[dev]"                 # pyproject.toml del proyecto
-# mínimo para solo el backend:
-# pip install fastapi uvicorn pydantic
+uv sync --extra dev      # crea .venv, genera uv.lock e instala todo (pyproject.toml)
 ```
 
 ## 4. Flujo local completo (auditoría → entrenamiento → evaluación)
@@ -105,13 +103,36 @@ MAP @K para K=1,3,5,10 de `topfreq`, `cooccur` y `nextcart_final`,
 cobertura, repeat/explore, latencia offline, metodología del split
 (oficial Instacart prior→train, sin fuga) y advertencias.
 
-## 6. Backend: dependencias mínimas y arranque
+## 6. Backend y frontend: arranque para pruebas
+
+Backend (FastAPI, con `uv`):
 
 ```bash
-pip install fastapi uvicorn            # pydantic ya viene con fastapi
+# bash / Linux / macOS
 export NEXTCART_MODEL_PATH=artifacts/nextcart_model.json
-uvicorn src.backend:app --host 0.0.0.0 --port 8000
+uv run uvicorn src.backend:app --host 0.0.0.0 --port 8000
 ```
+
+```powershell
+# Windows (PowerShell)
+$env:NEXTCART_MODEL_PATH = "artifacts/nextcart_model.json"
+uv run uvicorn src.backend:app --host 127.0.0.1 --port 8000
+```
+
+Frontend (React + Vite, con `pnpm`) en otra terminal:
+
+```bash
+cd frontend
+pnpm install
+pnpm dev    # http://localhost:5173
+```
+
+Por defecto el frontend llama por rutas relativas y el **proxy de Vite**
+reenvía `/v1` y `/health` al backend (`http://localhost:8000`, configurable
+con `NEXTCART_BACKEND_URL`). Alternativa: llamar directo configurando
+`VITE_NEXTCART_API_BASE_URL` en `frontend/.env` (ver `frontend/.env.example`);
+el backend ya habilita CORS para los orígenes de Vite
+(`localhost:5173/4173`). Detalles en `frontend/README.md`.
 
 Reglas de arranque verificables en los tests: el backend **no entrena**, no
 descarga el dataset, no ejecuta el flujo y no reconstruye reglas pesadas;
@@ -123,9 +144,12 @@ Variables de entorno:
 | Variable | Uso |
 |---|---|
 | `NEXTCART_MODEL_PATH` | Ruta del artefacto del modelo (obligatoria para servir) |
+| `NEXTCART_DATA_DIR` | Directorio de los CSV de Instacart para construir el catálogo (default `data/`) |
+| `NEXTCART_CATALOG_DB_PATH` | Ruta de la BD SQLite del catálogo (default `data/catalog.db`; se construye sola si falta) |
 | `NEXTCART_MANIFEST_PATH` | Ruta del manifiesto (opcional; por defecto junto al modelo) |
 | `NEXTCART_ADMIN_TOKEN` | Habilita y protege `POST /v1/admin/reload-model` |
 | `NEXTCART_EVENTS_PATH` | Ruta del log de eventos (default `logs/events.jsonl`) |
+| `NEXTCART_CORS_ORIGINS` | Orígenes CORS permitidos, separados por comas (default: Vite en `localhost:5173`/`4173`) |
 
 ## 7. Probar los endpoints con curl
 
@@ -153,10 +177,17 @@ curl -s -X POST localhost:8000/v1/events/impression \
 curl -s -X POST localhost:8000/v1/events/feedback \
   -H 'Content-Type: application/json' \
   -d '{"session_id":"sess-001","product_id":21137,"event":"accepted",
-       "recommendation_ids":[21137,47209]}'
+       "recommendation_ids":[21137,47209]}'# métricas observadas
 
-# métricas observadas
 curl -s localhost:8000/v1/metrics/summary
+
+# catálogo del dataset (SQLite, precios demo deterministas COP)
+
+curl -s "localhost:8000/v1/catalog/products?search=banana&department_id=4&limit=3"
+
+curl -s localhost:8000/v1/catalog/products/24852
+
+curl -s localhost:8000/v1/catalog/departments
 
 # recarga del modelo ya entrenado (opcional, protegido)
 export NEXTCART_ADMIN_TOKEN=dev-token
@@ -190,7 +221,10 @@ backend lo advierte en `/v1/metrics/summary`.
 
 - **Inventario:** no hay stock real; el filtro de agotados solo se puede
   aplicar en tiempo de inferencia con datos en vivo de la tienda.
-- **Precio:** sin precios ni promociones; no se puede optimizar margen.
+- **Precio:** sin precios ni promociones; no se puede optimizar margen. El
+  catálogo HTTP sí sirve **precios de demostración deterministas** en COP
+  (`mismo product_id ⇒ mismo precio`; hash con semilla fija) para la
+  interfaz, marcados como demo; no son precios reales.
 - **Posición del widget:** sin impresiones ni posición; no hay señal de
   exposición ni de vertical-bias.
 - **Aceptación:** sin feedback de usuarios; la métrica comercial solo con A/B.
@@ -202,26 +236,26 @@ backend lo advierte en `/v1/metrics/summary`.
 ```
 nextcart-agent/
 ├── README.md
-├── pyproject.toml
-├── prompt_para_agente_nextcart.md   # especificación original
-├── data/README.md                   # dónde dejar los CSV (dataset/ autodetect)
-├── dataset/                         # CSV de Instacart (no versionados)
+├── pyproject.toml          # dependencias del proyecto (uv genera uv.lock)
+├── data/README.md          # dónde dejar los CSV del dataset Instacart
 ├── src/
 │   ├── config.py        # rutas, defaults, semilla
 │   ├── schemas.py       # contratos Pydantic (validaciones)
+│   ├── catalog_db.py    # catálogo SQLite del dataset + precios demo deterministas
 │   ├── audit_dataset.py # auditoría S1–S5 con DuckDB + figuras + informe
 │   ├── train_agent.py   # modelo coocurrencia+frecuencia; manifiesto
 │   ├── evaluate_agent.py# offline eval @K, cobertura, repeat/explore, latencia
 │   ├── inference.py     # carga del artefacto (sin reentrenar) + CLI demo
 │   ├── artifacts.py     # validación/verificación de artefacto y manifiesto
 │   ├── storage.py       # JSON atómico, JSONL, hash, timers
-│   └── backend.py       # FastAPI: /health, /v1/*, eventos y métricas
+│   └── backend.py       # FastAPI: /health, /v1/*, eventos, métricas y CORS
+├── tests/               # fixtures mini_dataset + 37 tests (sin red)
+├── frontend/            # React + Vite + Chakra (pnpm); ver frontend/README.md
+├── notebooks/nextcart_audit_train.ipynb  # notebook independiente
 ├── reports/             # audit_results.json, dataset_audit.md,
 │                        # model_metrics.json, figures/*  (ver README)
 ├── artifacts/           # nextcart_model.json + manifest (ver README)
-├── logs/events.jsonl    # eventos del backend
-├── notebooks/nextcart_audit_train.ipynb  # notebook independiente
-└── tests/               # fixtures mini_dataset + 37 tests (sin red)
+└── logs/events.jsonl    # eventos del backend (se crea al correr)
 ```
 
 ## 12. Flujo resumido (lo que explica este README)
@@ -229,4 +263,6 @@ nextcart-agent/
 `auditoría local` → `entrenamiento local` → `artefactos + manifiesto`
 → `backend` (solo carga y sirve, nunca entrena). Los tests livianos
 (`pytest -q`, 37 tests, segundos) cubren esquemas, inferencia, contratos
-HTTP y pipeline completo sobre un fixture pequeño.
+HTTP y pipeline completo sobre un fixture pequeño. El frontend además
+tiene una suite E2E con Playwright (`frontend/e2e`, `pnpm test:e2e`) que
+corre contra el backend real; CI en `.github/workflows/ci.yml`.

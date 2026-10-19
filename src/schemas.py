@@ -144,6 +144,8 @@ class HealthResponse(BaseModel):
     model_loaded: bool
     model_version: str | None = None
     error: str | None = None
+    # Catálogo SQLite: carga independiente del modelo (puede fallar sin datos).
+    catalog_loaded: bool = False
 
 
 class MetricsSummary(BaseModel):
@@ -164,3 +166,46 @@ class ReloadResponse(BaseModel):
     reloaded: bool
     model_version: str | None
     detail: str
+
+
+class ProductItem(BaseModel):
+    """Producto del catálogo servido desde SQLite (dataset Instacart)."""
+
+    product_id: int
+    product_name: str
+    aisle_id: int
+    department_id: int
+    # Precio de demostración determinista en COP (el dataset no trae precios:
+    # mismo product_id ⇒ mismo precio siempre). Ver src/catalog_db.py.
+    price: int
+    currency: Literal["COP"] = "COP"
+    aisle: str | None = None
+    department: str | None = None
+
+
+class CatalogProductsResponse(BaseModel):
+    total: int
+    limit: int
+    offset: int
+    items: list[ProductItem]
+
+
+class DepartmentItem(BaseModel):
+    department_id: int
+    department: str
+    product_count: int
+
+
+class CatalogDepartmentsResponse(BaseModel):
+    items: list[DepartmentItem]
+
+
+class AisleItem(BaseModel):
+    aisle_id: int
+    aisle: str
+    department_id: int | None = None
+    product_count: int
+
+
+class CatalogAislesResponse(BaseModel):
+    items: list[AisleItem]
