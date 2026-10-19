@@ -636,19 +636,21 @@ name = "nextcart-agent"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
-    { name = "duckdb" },
     { name = "fastapi" },
+    { name = "pydantic" },
+    { name = "uvicorn" },
+]
+
+[package.optional-dependencies]
+analysis = [
+    { name = "duckdb" },
     { name = "matplotlib" },
     { name = "numpy", version = "2.4.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12'" },
     { name = "numpy", version = "2.5.4", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
     { name = "pandas" },
     { name = "polars" },
     { name = "pyarrow" },
-    { name = "pydantic" },
-    { name = "uvicorn" },
 ]
-
-[package.optional-dependencies]
 dev = [
     { name = "httpx" },
     { name = "pytest" },
@@ -656,19 +658,19 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "duckdb", specifier = ">=1.1.0" },
+    { name = "duckdb", marker = "extra == 'analysis'", specifier = ">=1.1.0" },
     { name = "fastapi", specifier = ">=0.111.0" },
     { name = "httpx", marker = "extra == 'dev'", specifier = ">=0.27.0" },
-    { name = "matplotlib", specifier = ">=3.8.0" },
-    { name = "numpy", specifier = ">=1.26.0" },
-    { name = "pandas", specifier = ">=3.0.6" },
-    { name = "polars", specifier = ">=1.0.0" },
-    { name = "pyarrow", specifier = ">=26.0.0" },
+    { name = "matplotlib", marker = "extra == 'analysis'", specifier = ">=3.8.0" },
+    { name = "numpy", marker = "extra == 'analysis'", specifier = ">=1.26.0" },
+    { name = "pandas", marker = "extra == 'analysis'", specifier = ">=3.0.6" },
+    { name = "polars", marker = "extra == 'analysis'", specifier = ">=1.0.0" },
+    { name = "pyarrow", marker = "extra == 'analysis'", specifier = ">=26.0.0" },
     { name = "pydantic", specifier = ">=2.7.0" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0.0" },
     { name = "uvicorn", specifier = ">=0.30.0" },
 ]
-provides-extras = ["dev"]
+provides-extras = ["analysis", "dev"]
 
 [[package]]
 name = "numpy"

@@ -59,7 +59,7 @@ boost de recompra, filtros de inventario/rechazo en inferencia). Sin LLM.
 ## 3. Instalación
 
 ```bash
-uv sync --extra dev      # crea .venv, genera uv.lock e instala todo (pyproject.toml)
+uv sync --extra dev --extra analysis  # entorno local completo, incluidos auditoría y entrenamiento
 ```
 
 ## 4. Flujo local completo (auditoría → entrenamiento → evaluación)
