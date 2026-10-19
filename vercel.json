@@ -12,7 +12,13 @@
   },
   "rewrites": [
     {
-      "source": "/(.*)",
+      "source": "/health",
+      "destination": {
+        "service": "app"
+      }
+    },
+    {
+      "source": "/v1/(.*)",
       "destination": {
         "service": "app"
       }
