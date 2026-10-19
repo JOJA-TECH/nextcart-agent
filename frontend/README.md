@@ -5,17 +5,18 @@ Frontend de checkout con recomendaciones que consume **exclusivamente** el backe
 ## Puesta en marcha
 
 ```bash
-# Backend, desde la raíz del repositorio (usa uv)
+# Backend, desde la raíz del repositorio
+cd backend
 uv sync --extra dev
 
 # bash / Linux / macOS
-export NEXTCART_MODEL_PATH=artifacts/nextcart_model.json
+export NEXTCART_MODEL_PATH=../artifacts/nextcart_model.json
 uv run uvicorn src.backend:app --host 0.0.0.0 --port 8000
 ```
 
 ```powershell
 # Windows (PowerShell)
-$env:NEXTCART_MODEL_PATH = "artifacts/nextcart_model.json"
+$env:NEXTCART_MODEL_PATH = "../artifacts/nextcart_model.json"
 uv run uvicorn src.backend:app --host 127.0.0.1 --port 8000
 ```
 
@@ -52,7 +53,7 @@ No se usa `/v1/admin/reload-model` (requiere token administrativo y no es operac
 ## Datos reales vs. datos de presentación
 
 - **Reales del backend**: los IDs numéricos del dataset Instacart (por ejemplo `24852`, `13176`, `21137`), los nombres del catálogo (`product_name`), departamentos y pasillos de `/v1/catalog` (SQLite construido con los CSV del dataset), `score`, `reason`, `source`, `fallback`, `warnings`, `model_version`, `latency_ms` y las métricas de `/v1/metrics/summary`.
-- **De presentación**: los **precios** y el total del carrito. El dataset Instacart no tiene precios: el backend asigna valores de demostración **deterministas** en COP (mismo `product_id` ⇒ mismo precio siempre; semilla configurable con `python -m src.catalog_db build --price-seed …`).
+- **De presentación**: los **precios** y el total del carrito. El dataset Instacart no tiene precios: el backend asigna valores de demostración **deterministas** en COP (mismo `product_id` ⇒ mismo precio siempre; semilla configurable con `cd backend && python -m src.catalog_db build --price-seed …`).
 - **Imágenes**: el dataset no incluye imágenes; todas las tarjetas usan el placeholder de canasta de comida (`ProductThumb` con `LuShoppingBasket`).
 
 El navegador de catálogo (`src/features/catalog/`) busca productos reales con debounce, filtra por departamento/pasillo, pagina de a 12 y agrega al carrito; un cache compartido por módulo (`catalogStore.ts`) resuelve cada `product_id` contra `/v1/catalog/products/{id}` una sola vez por sesión de página.
@@ -67,14 +68,14 @@ Cubierto por las dos vías:
 
 - **Proxy de desarrollo (por defecto):** sin `.env`, `vite.config.ts`
   reenvía `/v1` y `/health` al backend; el navegador nunca cruza orígenes.
-- **CORS en el backend:** `src/backend.py` incluye `CORSMiddleware` que
+- **CORS en el backend:** `backend/src/backend.py` incluye `CORSMiddleware` que
   acepta los orígenes de Vite (`http://localhost:5173` y
   `http://127.0.0.1:5173`, más `:4173` para `pnpm preview`). Útil cuando se
   usa `VITE_NEXTCART_API_BASE_URL` con la URL directa del backend.
 
 ## Verificación de conexión (2026-10-18)
 
-Probado end-to-end contra el backend real (`artifacts/nextcart_model.json`,
+Probado end-to-end contra el backend real (`../artifacts/nextcart_model.json`,
 Python 3.14 + uv, Node 24 + pnpm): `/health` con modelo cargado,
 `POST /v1/recommendations` con respuestas del modelo, ciclo
 impresión → feedback → `/v1/metrics/summary` actualizando contadores, todo a

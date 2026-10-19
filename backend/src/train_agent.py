@@ -6,8 +6,8 @@ El resultado es un artefacto JSON auditable más su manifiesto con hash SHA-256.
 
 Ejemplo:
     python src/train_agent.py --data-dir dataset \
-        --output artifacts/nextcart_model.json \
-        --metrics-output reports/model_metrics.json --seed 42 --min-support 5 --top-k 100
+        --output ../artifacts/nextcart_model.json \
+        --metrics-output ../reports/model_metrics.json --seed 42 --min-support 5 --top-k 100
 """
 
 from __future__ import annotations
@@ -508,7 +508,7 @@ def run_training(
             output,
             model,
             source_dataset="instacart-online-grocery-basket-analysis-dataset",
-            audit_results_path="../reports/audit_results.json",
+            audit_results_path="../../reports/audit_results.json",
             metrics_path=str(metrics_output) if metrics_output else None,
         )
         log_step(

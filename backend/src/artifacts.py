@@ -40,7 +40,7 @@ def load_model_json(path: Path | str) -> dict[str, Any]:
         raise ModelLoadError(
             f"No existe el artefacto de modelo en '{path}'. "
             "Ejecuta localmente: python src/train_agent.py --data-dir dataset "
-            "--output artifacts/nextcart_model.json"
+            "--output ../artifacts/nextcart_model.json"
         )
     try:
         model = read_json(path)

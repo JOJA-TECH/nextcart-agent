@@ -6,7 +6,7 @@ Los usuarios `test` no tienen ground truth público y se excluyen.
 
 Ejemplo:
     python src/evaluate_agent.py --data-dir dataset \
-        --model artifacts/nextcart_model.json --output reports/model_metrics.json
+        --model ../artifacts/nextcart_model.json --output ../reports/model_metrics.json
 """
 
 from __future__ import annotations

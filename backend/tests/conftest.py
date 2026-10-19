@@ -7,13 +7,15 @@ from pathlib import Path
 
 import pytest
 
-ROOT = Path(__file__).resolve().parents[1]
-if str(ROOT) not in sys.path:
-    sys.path.insert(0, str(ROOT))
+ROOT = Path(__file__).resolve().parents[2]
+BACKEND_ROOT = Path(__file__).resolve().parents[1]
+for import_root in (BACKEND_ROOT, ROOT):
+    if str(import_root) not in sys.path:
+        sys.path.insert(0, str(import_root))
 
 from src.storage import sha256_of_file, write_json_atomic  # noqa: E402
 
-MINI_DATASET = ROOT / "tests" / "fixtures" / "mini_dataset"
+MINI_DATASET = BACKEND_ROOT / "tests" / "fixtures" / "mini_dataset"
 
 
 def build_tiny_model() -> dict:

@@ -9,7 +9,7 @@ Reglas de inicio (verificadas en tests):
   endpoints de recomendación responden 503 con instrucciones.
 
 Arranque:
-    export NEXTCART_MODEL_PATH=artifacts/nextcart_model.json
+    export NEXTCART_MODEL_PATH=../artifacts/nextcart_model.json
     uvicorn src.backend:app --host 0.0.0.0 --port 8000
 """
 
@@ -165,7 +165,7 @@ def create_app(
         else:
             state.model_error = (
                 "NEXTCART_MODEL_PATH no está definido. Exporta la ruta del artefacto "
-                "entrenado, p. ej.: export NEXTCART_MODEL_PATH=artifacts/nextcart_model.json"
+                "entrenado, p. ej.: export NEXTCART_MODEL_PATH=../artifacts/nextcart_model.json"
             )
             print(f"[nextcart] advertencia: {state.model_error}")
         yield
