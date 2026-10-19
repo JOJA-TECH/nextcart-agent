@@ -5,8 +5,8 @@ Cargar un modelo NO es entrenarlo: este módulo solo lee el JSON generado por
 un estado de sesión (carrito, navegación, historial, rechazos, inventario).
 
 Ejemplos:
-    python src/inference.py --model artifacts/nextcart_model.json --demo
-    python src/inference.py --model artifacts/nextcart_model.json \
+    python src/inference.py --model ../artifacts/nextcart_model.json --demo
+    python src/inference.py --model ../artifacts/nextcart_model.json \
         --cart 24852,13176 --history "[[24852,13176],[47209]]" --k 3
 """
 
@@ -337,8 +337,8 @@ def main(argv: list[str] | None = None) -> int:
         print(
             "\nInstrucciones:\n"
             "  1. En el equipo con el dataset, ejecuta: "
-            "python src/train_agent.py --data-dir dataset --output artifacts/nextcart_model.json\n"
-            "  2. Copia artifacts/nextcart_model.json (y artifact_manifest.json) "
+            "python src/train_agent.py --data-dir dataset --output ../artifacts/nextcart_model.json\n"
+            "  2. Copia ../artifacts/nextcart_model.json (y artifact_manifest.json) "
             "a esta máquina.\n"
             "  3. Reejecuta este comando.",
             file=sys.stderr,

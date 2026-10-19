@@ -5,17 +5,18 @@ Frontend de checkout con recomendaciones que consume **exclusivamente** el backe
 ## Puesta en marcha
 
 ```bash
-# Backend, desde la raíz del repositorio (usa uv)
+# Backend, desde la raíz del repositorio
+cd backend
 uv sync --extra dev
 
 # bash / Linux / macOS
-export NEXTCART_MODEL_PATH=artifacts/nextcart_model.json
+export NEXTCART_MODEL_PATH=../artifacts/nextcart_model.json
 uv run uvicorn src.backend:app --host 0.0.0.0 --port 8000
 ```
 
-```
+```powershell
 # Windows (PowerShell)
-$env:NEXTCART_MODEL_PATH = "artifacts/nextcart_model.json"
+$env:NEXTCART_MODEL_PATH = "../artifacts/nextcart_model.json"
 uv run uvicorn src.backend:app --host 127.0.0.1 --port 8000
 ```
 
@@ -28,32 +29,23 @@ pnpm dev    # http://localhost:5173
 
 La URL del backend se resuelve así:
 
-- **Por defecto (sin ****`.env`**** ):** rutas relativas → el **proxy de Vite**
-(`vite.config.ts`) reenvía `/v1` y `/health` a `http://localhost:8000`
-(destino configurable con `NEXTCART_BACKEND_URL` ).
-
+- **Por defecto (sin `.env`):** rutas relativas → el **proxy de Vite**
+  (`vite.config.ts`) reenvía `/v1` y `/health` a `http://localhost:8000`
+  (destino configurable con `NEXTCART_BACKEND_URL`).
 - **URL directa:** copia `.env.example` a `.env` y define
-`VITE_NEXTCART_API_BASE_URL=http://localhost:8000` (o déjala vacía para
-volver al proxy ). Requiere CORS, que ya está habilitado en el backend.
+  `VITE_NEXTCART_API_BASE_URL=http://localhost:8000` (o déjala vacía para
+  volver al proxy). Requiere CORS, que ya está habilitado en el backend.
 
 ## Endpoints consumidos (único modo de ejecución)
 
 - `GET /health`
-
 - `POST /v1/recommendations`
-
 - `GET /v1/catalog/products` (búsqueda, filtros por departamento/pasillo y paginación)
-
 - `GET /v1/catalog/products/{id}` (resolución de IDs de recomendaciones/carrito)
-
 - `GET /v1/catalog/departments`
-
 - `GET /v1/catalog/aisles`
-
 - `POST /v1/events/impression`
-
 - `POST /v1/events/feedback`
-
 - `GET /v1/metrics/summary`
 
 No se usa `/v1/admin/reload-model` (requiere token administrativo y no es operación de usuario).
@@ -61,9 +53,7 @@ No se usa `/v1/admin/reload-model` (requiere token administrativo y no es operac
 ## Datos reales vs. datos de presentación
 
 - **Reales del backend**: los IDs numéricos del dataset Instacart (por ejemplo `24852`, `13176`, `21137`), los nombres del catálogo (`product_name`), departamentos y pasillos de `/v1/catalog` (SQLite construido con los CSV del dataset), `score`, `reason`, `source`, `fallback`, `warnings`, `model_version`, `latency_ms` y las métricas de `/v1/metrics/summary`.
-
-- **De presentación**: los **precios** y el total del carrito. El dataset Instacart no tiene precios: el backend asigna valores de demostración **deterministas** en COP (mismo `product_id` ⇒ mismo precio siempre; semilla configurable con `python -m src.catalog_db build --price-seed …`).
-
+- **De presentación**: los **precios** y el total del carrito. El dataset Instacart no tiene precios: el backend asigna valores de demostración **deterministas** en COP (mismo `product_id` ⇒ mismo precio siempre; semilla configurable con `cd backend && python -m src.catalog_db build --price-seed …`).
 - **Imágenes**: el dataset no incluye imágenes; todas las tarjetas usan el placeholder de canasta de comida (`ProductThumb` con `LuShoppingBasket`).
 
 El navegador de catálogo (`src/features/catalog/`) busca productos reales con debounce, filtra por departamento/pasillo, pagina de a 12 y agrega al carrito; un cache compartido por módulo (`catalogStore.ts`) resuelve cada `product_id` contra `/v1/catalog/products/{id}` una sola vez por sesión de página.
@@ -77,16 +67,15 @@ El backend actual no expone un endpoint de explicación con IA. El frontend **no
 Cubierto por las dos vías:
 
 - **Proxy de desarrollo (por defecto):** sin `.env`, `vite.config.ts`
-reenvía `/v1` y `/health` al backend; el navegador nunca cruza orígenes.
-
-- **CORS en el backend:** `src/backend.py` incluye `CORSMiddleware` que
-acepta los orígenes de Vite (`http://localhost:5173` y
-`http://127.0.0.1:5173`, más `:4173` para `pnpm preview` ). Útil cuando se
-usa `VITE_NEXTCART_API_BASE_URL` con la URL directa del backend.
+  reenvía `/v1` y `/health` al backend; el navegador nunca cruza orígenes.
+- **CORS en el backend:** `backend/src/backend.py` incluye `CORSMiddleware` que
+  acepta los orígenes de Vite (`http://localhost:5173` y
+  `http://127.0.0.1:5173`, más `:4173` para `pnpm preview`). Útil cuando se
+  usa `VITE_NEXTCART_API_BASE_URL` con la URL directa del backend.
 
 ## Verificación de conexión (2026-10-18)
 
-Probado end-to-end contra el backend real (`artifacts/nextcart_model.json`,
+Probado end-to-end contra el backend real (`../artifacts/nextcart_model.json`,
 Python 3.14 + uv, Node 24 + pnpm): `/health` con modelo cargado,
 `POST /v1/recommendations` con respuestas del modelo, ciclo
 impresión → feedback → `/v1/metrics/summary` actualizando contadores, todo a
@@ -105,26 +94,19 @@ reutiliza los ya activos. En CI corre en GitHub Actions
 Cubiertas (8 tests):
 
 - T01 — recomendaciones reales con `model_version`, `score` y `source`.
-
 - T02 — aceptar: evento `accepted` con HTTP 202, el producto entra al
-carrito real y la tarjeta aceptada se retira del widget.
-
+  carrito real y la tarjeta aceptada se retira del widget.
 - T03 — rechazar: evento `rejected` con la tarjeta retirada y reemplazos
-pedidos al backend.
-
+  pedidos al backend.
 - T04 — los IDs rechazados no se repiten: el backend los filtra en la
-siguiente solicitud.
-
+  siguiente solicitud.
 - T08 — solicitud inválida: HTTP 422 mostrado de forma legible.
-
 - T09 — carrito vacío: `cart: []` real con `fallback: true` y warnings.
-
 - Backend apagado — badge «Backend no disponible» y error de conexión sin
-datos simulados (la red se aborta a nivel de navegador).
-
+  datos simulados (la red se aborta a nivel de navegador).
 - T07 — modelo no cargado: badge «Backend degradado» y 503 con
-instrucción; retransmite las respuestas reales que produce el backend
-sin `NEXTCART_MODEL_PATH`.
+  instrucción; retransmite las respuestas reales que produce el backend
+  sin `NEXTCART_MODEL_PATH`.
 
 Pendientes: T05 (un solo candidato), T10 (inventario de 22935) y
 T11/T12 (notas informativas sin endpoint que invocar). El lint no está en
@@ -134,20 +116,15 @@ errores preexistentes del template.
 ## Comportamiento de la interfaz
 
 - El carrito inicial dispara la consulta y cada cambio de carrito
-re-consulta con debounce de 400 ms.
-
+  re-consulta con debounce de 400 ms.
 - La sesión persiste en `localStorage` (`nextcart_session_id`): los
-rechazados sobreviven a recargas de la página.
-
+  rechazados sobreviven a recargas de la página.
 - Un solo voto por tarjeta: tras aceptar/rechazar/ignorar, los botones
-quedan deshabilitados.
-
+  quedan deshabilitados.
 - Los botones de tarjeta tienen `aria-label` con el nombre del producto.
 
 ## Limitaciones
 
 - Los precios y el total del carrito son de demostración; no representan datos reales.
-
 - El dataset Instacart no permite validar una tasa comercial de aceptación ≥ 12 % sin un A/B real; la interfaz muestra el `disclaimer` de métricas.
-
 - No hay autenticación de usuario en el frontend (el backend actual no la implementa).

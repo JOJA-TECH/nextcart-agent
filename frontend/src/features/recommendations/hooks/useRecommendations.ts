@@ -77,9 +77,7 @@ export function useRecommendations(
           rejected: rejectedRef.current,
           inventory:
             options?.inventoryOverride ??
-            Object.fromEntries(
-              Object.keys(DEFAULT_INVENTORY).map((key) => [key, true]),
-            ),
+            DEFAULT_INVENTORY,
           ...(options?.invalidRequest ? { k: 99 } : { k: options?.k ?? 4 }),
         }
         const result = await client.recommendations(payload)
@@ -94,7 +92,6 @@ export function useRecommendations(
         onBackendEvent?.()
       }
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [client, sessionId, effectiveCart, onBackendEvent],
   )
 

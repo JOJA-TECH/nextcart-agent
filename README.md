@@ -1,277 +1,316 @@
 # NEXTCART-AGENT
 
-Agente de recomendación de productos complementarios (**next-basket
-recommendation**) para una tienda en línea, entrenado y evaluado
-**localmente** sobre el dataset Instacart. El proyecto cubre el flujo
-completo: **auditoría del dataset (S1–S5) → entrenamiento local →
-artefactos con manifiesto → backend FastAPI de inferencia**.
+Agente inteligente de recomendación de productos complementarios y de próxima cesta para un checkout de comercio electrónico.
 
-Modelo: baseline explicable y reproducible de **frecuencia global +
-coocurrencia en cestas** (soporte, confianza, lift, recencia relativa,
-boost de recompra, filtros de inventario/rechazo en inferencia). Sin LLM.
+> **Estado:** prototipo reproducible, explicable y evaluado offline. El repositorio no afirma una conversión comercial del 12 %: ese KPI requiere un experimento A/B con usuarios reales.
 
-> ⚠️ El objetivo comercial de **≥ 12 % de aceptación en un A/B de dos
-semanas** no puede validarse con Instacart: el dataset no contiene
-impresiones, exposición, grupo control ni feedback de usuarios. Las
-métricas de este proyecto son **offline** (predicción de cesta).
+## Índice
 
----
+- [Qué entrega el proyecto](#qué-entrega-el-proyecto)
+- [Arquitectura e infraestructura](#arquitectura-e-infraestructura)
+- [Estructura del repositorio](#estructura-del-repositorio)
+- [Instalación](#instalación)
+- [Ejecución rápida](#ejecución-rápida)
+- [Flujo de datos y endpoints](#flujo-de-datos-y-endpoints)
+- [Logs y evidencias](#logs-y-evidencias)
+- [Pruebas](#pruebas)
+- [Métricas y alcance](#métricas-y-alcance)
+- [Limitaciones](#limitaciones)
 
-## 1. Qué hace el proyecto
+## Qué entrega el proyecto
 
-| Etapa | Script | Qué produce |
-| --- | --- | --- |
-| Auditoría del dataset | `src/audit_dataset.py` | `reports/audit_results.json`, `reports/dataset_audit.md`, `reports/figures/*.png` |
-| Entrenamiento | `src/train_agent.py` | `artifacts/nextcart_model.json`, `artifacts/artifact_manifest.json` |
-| Evaluación offline | `src/evaluate_agent.py` | `reports/model_metrics.json`, `reports/figures/model_metrics_at_k.png` |
-| Inferencia local | `src/inference.py` | Recomendaciones demo/CLI con el modelo ya entrenado (sin reentrenar) |
-| Backend HTTP | `src/backend.py` | FastAPI con `/health`, `/v1/recommendations`, `/v1/catalog/*`, eventos y métricas |
-| Catálogo SQLite | `src/catalog_db.py` | `data/catalog.db` (productos/pasillos/departamentos + precios demo deterministas) |
-| Frontend de checkout | `frontend/` | React + Vite (pnpm) que consume el backend real; ver `frontend/README.md` |
-| Notebook independiente | `notebooks/nextcart_audit_train.ipynb` | Auditoría S1–S5 (más S6/S7 adaptados del proyecto de referencia `old/`), entrenamiento y evaluación, autocontenido y didáctico; escribe en `notebooks/nb_out/` |
+NEXTCART recibe el carrito, navegación, historial reciente, productos rechazados, inventario y el número de recomendaciones solicitado. Genera candidatos con frecuencia global y reglas de coocurrencia, filtra productos no elegibles y devuelve recomendaciones explicables con `product_id`, `score`, `reason`, `source`, `fallback`, `warnings`, `latency_ms` y `model_version`.
 
-## 2. Todo se ejecuta en el equipo local
+El proyecto cubre el ciclo completo:
 
-- No hay plataformas externas ni descargas automáticas. El dataset se lee
-desde disco (por defecto `dataset/` o `data/`; configurable con
-`--data-dir` o `NEXTCART_DATA_DIR`).
+```text
+Auditoría del dataset → entrenamiento offline → evaluación →
+artefacto versionado → backend FastAPI → frontend React/Vite →
+impresión y feedback → logs y métricas observadas
+```
 
-- Lectura por consultas con **DuckDB**, con límite de memoria configurable
-(`--duckdb-memory-limit`) y volcado a disco (`--spill-dir`; evita `/tmp`
-si es tmpfs). Los pares de coocurrencia se generan **por bloques** y se
-escriben a parquet temporal para no materializar 150M+ de pares en RAM.
+El agente no utiliza LLM. La decisión la toma código Python con reglas de coocurrencia, frecuencia, recompra, disponibilidad y filtros de sesión.
 
-- Configurable: rutas, `--workers`, `--block-size`, muestreo opcional
-(`--sample-users`, `--max-eval-users`; queda documentado en los
-metadatos con método/semilla/motivo). La ejecución completa es el default.
+## Arquitectura e infraestructura
 
-- Cada paso imprime qué se está ejecutando y cuánto tarda (`StepTimer`).
+### Diagrama de componentes
 
-- Si faltan archivos del dataset, el script aborta mostrando los que
-faltan e instrucciones exactas de corrección. Nunca inventa resultados.
+```mermaid
+flowchart LR
+    U[Usuario del checkout] --> FE[Frontend React + Vite\nfrontend/]
+    FE -->|HTTP REST /health y /v1/*| API[Backend FastAPI\nbackend/src/backend.py]
+    API --> INF[Inferencia\nbackend/src/inference.py]
+    INF --> MODEL[Modelo versionado\nartifacts/nextcart_model.json]
+    API --> CAT[Catálogo SQLite\ndata/catalog.db]
+    CAT --> DATA[CSV Instacart\ndata/]
+    API --> LOG[Eventos JSONL\nlogs/events.jsonl]
+    API --> MET[Resumen de métricas\n/v1/metrics/summary]
+    TRAIN[Entrenamiento y evaluación\nbackend/src/train_agent.py\nbackend/src/evaluate_agent.py] --> MODEL
+    DATA --> TRAIN
+    TRAIN --> REP[Reportes offline\nreports/]
+    MODEL --> MAN[Manifiesto SHA-256\nartifacts/artifact_manifest.json]
+```
 
-- Todos los resultados se escriben a disco y pueden revisarse después.
+### Flujo de una recomendación
 
-### Requisitos de recursos
+```mermaid
+sequenceDiagram
+    participant C as Checkout React
+    participant B as Backend FastAPI
+    participant S as Schemas
+    participant I as Inference
+    participant M as Modelo JSON
+    participant L as JSONL
 
-| Recurso | Mínimo recomendado |
-| --- | --- |
-| RAM | 6–8 GB (DuckDB limitado a 2 GB por defecto) |
-| Disco | ~1 GB libre en `reports/` y spill dir |
-| CPU | 4+ núcleos útiles para evaluación paralela (`--workers`) |
-| Python | ≥ 3.11 |
+    C->>B: POST /v1/recommendations
+    B->>S: Validar carrito, k, inventario y sesión
+    S-->>B: Solicitud válida o HTTP 422
+    B->>I: Construir contexto y candidatos
+    I->>M: Cargar reglas y productos populares
+    M-->>I: Candidatos puntuados
+    I-->>B: Recomendaciones + warnings + latencia
+    B->>L: Registrar evento recommendation
+    B-->>C: JSON de respuesta
+    C->>B: impression o feedback
+    B->>L: Registrar impresión/accepted/rejected/ignored
+    B-->>C: HTTP 202 y métricas observadas
+```
 
-## 3. Instalación
+### Decisiones de infraestructura
+
+| Capa | Tecnología | Responsabilidad |
+|---|---|---|
+| Interfaz | React, Vite, TypeScript, Chakra UI | Checkout, catálogo, widget, estados de carga/error y feedback. |
+| API | FastAPI + Pydantic | Contratos, validación, inferencia, catálogo, eventos y métricas. |
+| Modelo | Python, coocurrencia y frecuencia | Generación y puntuación explicable de candidatos. |
+| Catálogo | SQLite | Productos, pasillos, departamentos y precios demo deterministas. |
+| Persistencia de evidencias | JSON, JSONL y PNG | Modelo, manifiesto, auditorías, métricas, logs y figuras. |
+| Ejecución | `uv` + `pnpm` | Entorno Python y entorno frontend reproducibles. |
+
+## Estructura del repositorio
+
+```text
+nextcart-agent/
+├── README.md                         # guía principal del proyecto
+├── backend/                          # todo el backend Python
+│   ├── pyproject.toml                # dependencias Python
+│   ├── uv.lock                       # bloqueo reproducible de dependencias
+│   ├── src/
+│   │   ├── backend.py                # aplicación FastAPI y endpoints
+│   │   ├── schemas.py                # contratos Pydantic
+│   │   ├── inference.py              # carga y recomendación
+│   │   ├── train_agent.py             # entrenamiento offline
+│   │   ├── evaluate_agent.py          # métricas offline y latencia
+│   │   ├── audit_dataset.py           # auditoría S1–S5
+│   │   ├── catalog_db.py              # catálogo SQLite
+│   │   ├── artifacts.py               # manifiesto y hash SHA-256
+│   │   ├── storage.py                 # JSON, JSONL y temporizadores
+│   │   └── config.py                  # rutas y configuración
+│   └── tests/                         # 44 pruebas backend y fixtures
+├── frontend/                          # React/Vite y pruebas Playwright
+├── data/                              # CSV Instacart y catalog.db
+├── artifacts/                         # modelo y manifiesto
+├── reports/                           # métricas, auditoría y figuras
+├── logs/                              # eventos JSONL generados por la API
+├── notebooks/                         # notebook reproducible de apoyo
+└── .github/workflows/ci.yml           # CI backend + frontend + E2E
+```
+
+## Instalación
+
+Requisitos recomendados: Python 3.11+, `uv`, Node.js 24+, `pnpm` y Chromium para Playwright.
+
+### Backend
 
 ```bash
-uv sync --extra dev      # crea .venv, genera uv.lock e instala todo (pyproject.toml)
+cd backend
+uv sync --extra dev
 ```
 
-## 4. Flujo local completo (auditoría → entrenamiento → evaluación)
-
-```bash
-# En el equipo local, con el dataset Instacart en dataset/ (o data/)
-python src/audit_dataset.py --data-dir dataset --output-dir reports
-python src/train_agent.py --data-dir dataset \
-    --output artifacts/nextcart_model.json \
-    --metrics-output reports/model_metrics.json \
-    --seed 42 --min-support 5 --top-k 100
-python src/evaluate_agent.py --data-dir dataset \
-    --model artifacts/nextcart_model.json --output reports/model_metrics.json
-```
-
-Con máquinas modestas, muestreo (queda registrado en los metadatos):
-
-```bash
-python src/audit_dataset.py --data-dir dataset --output-dir reports --sample-users 30000
-python src/evaluate_agent.py --data-dir dataset --model artifacts/nextcart_model.json \
-    --output reports/model_metrics.json --max-eval-users 20000 --workers 4
-```
-
-Cada script tiene `--help` con todos los parámetros.
-
-## 5. Qué genera cada etapa
-
-**Auditoría:** `reports/audit_results.json` (S1–S5 con métricas,
-interpretación y limitaciones + decisión) y `reports/dataset_audit.md`
-(informe del flujo con las figuras incrustadas).
-
-**Entrenamiento:** `artifacts/nextcart_model.json` (versión, algoritmo,
-parámetros, popular_products con recencia, association_rules
-`[consecuente, count, confidence, lift]`, catálogo) y
-`artifacts/artifact_manifest.json` (hash sha256, versiones, referencias).
-Si el modelo no supera la validación pre-guardado se marca `experimental`,
-nunca `candidate` (producción).
-
-**Evaluación:** `reports/model_metrics.json` con Precision/Recall/HitRate/
-MAP @K para K=1,3,5,10 de `topfreq`, `cooccur` y `nextcart_final`,
-cobertura, repeat/explore, latencia offline, metodología del split
-(oficial Instacart prior→train, sin fuga) y advertencias.
-
-## 6. Backend y frontend: arranque para pruebas
-
-Backend (FastAPI, con `uv`):
-
-```bash
-# bash / Linux / macOS
-export NEXTCART_MODEL_PATH=artifacts/nextcart_model.json
-uv run uvicorn src.backend:app --host 0.0.0.0 --port 8000
-```
-
-```
-# Windows (PowerShell)
-$env:NEXTCART_MODEL_PATH = "artifacts/nextcart_model.json"
-uv run uvicorn src.backend:app --host 127.0.0.1 --port 8000
-```
-
-Frontend (React + Vite, con `pnpm`) en otra terminal:
+### Frontend
 
 ```bash
 cd frontend
 pnpm install
-pnpm dev    # http://localhost:5173
 ```
 
-Por defecto el frontend llama por rutas relativas y el **proxy de Vite**
-reenvía `/v1` y `/health` al backend (`http://localhost:8000`, configurable
-con `NEXTCART_BACKEND_URL` ). Alternativa: llamar directo configurando
-`VITE_NEXTCART_API_BASE_URL` en `frontend/.env` (ver `frontend/.env.example`);
-el backend ya habilita CORS para los orígenes de Vite
-(`localhost:5173/4173`). Detalles en `frontend/README.md`.
+## Ejecución rápida
 
-Reglas de arranque verificables en los tests: el backend **no entrena**, no
-descarga el dataset, no ejecuta el flujo y no reconstruye reglas pesadas;
-solo carga el artefacto JSON y verifica el manifiesto (existencia, versión,
-hash). Sin modelo: `/health` responde `model_loaded: false` con instrucciones.
+Abre dos terminales desde la raíz del repositorio.
 
-Variables de entorno:
-
-| Variable | Uso |
-| --- | --- |
-| `NEXTCART_MODEL_PATH` | Ruta del artefacto del modelo (obligatoria para servir) |
-| `NEXTCART_DATA_DIR` | Directorio de los CSV de Instacart para construir el catálogo (default `data/`) |
-| `NEXTCART_CATALOG_DB_PATH` | Ruta de la BD SQLite del catálogo (default `data/catalog.db`; se construye sola si falta) |
-| `NEXTCART_MANIFEST_PATH` | Ruta del manifiesto (opcional; por defecto junto al modelo) |
-| `NEXTCART_ADMIN_TOKEN` | Habilita y protege `POST /v1/admin/reload-model` |
-| `NEXTCART_EVENTS_PATH` | Ruta del log de eventos (default `logs/events.jsonl`) |
-| `NEXTCART_CORS_ORIGINS` | Orígenes CORS permitidos, separados por comas (default: Vite en `localhost:5173`/`4173`) |
-
-## 7. Probar los endpoints con curl
+### Terminal 1 — backend
 
 ```bash
-# salud
-curl -s localhost:8000/health
-
-# recomendaciones (inventario con claves string, k entre 1 y 10)
-curl -s -X POST localhost:8000/v1/recommendations \
-  -H 'Content-Type: application/json' \
-  -d '{"session_id":"sess-001","cart":[24852,13176],
-       "navigation":[{"type":"view","product_id":47209}],
-       "recent_history":[[24852,13176],[47209]],
-       "rejected":[22935],
-       "inventory":{"21137":true,"22935":false},
-       "k":3}'
-
-# impresión de las recomendaciones mostradas
-curl -s -X POST localhost:8000/v1/events/impression \
-  -H 'Content-Type: application/json' \
-  -d '{"session_id":"sess-001","recommendation_ids":[21137,47209],
-       "cart":[24852,13176],"model_version":"2000000.1"}'
-
-# feedback (accepted | rejected | ignored)
-curl -s -X POST localhost:8000/v1/events/feedback \
-  -H 'Content-Type: application/json' \
-  -d '{"session_id":"sess-001","product_id":21137,"event":"accepted",
-       "recommendation_ids":[21137,47209]}'# métricas observadas
-
-curl -s localhost:8000/v1/metrics/summary
-
-# catálogo del dataset (SQLite, precios demo deterministas COP)
-
-curl -s "localhost:8000/v1/catalog/products?search=banana&department_id=4&limit=3"
-
-curl -s localhost:8000/v1/catalog/products/24852
-
-curl -s localhost:8000/v1/catalog/departments
-
-# recarga del modelo ya entrenado (opcional, protegido)
-export NEXTCART_ADMIN_TOKEN=dev-token
-curl -s -X POST localhost:8000/v1/admin/reload-model \
-  -H 'X-Admin-Token: dev-token'
+cd backend
+export NEXTCART_MODEL_PATH=../artifacts/nextcart_model.json
+export NEXTCART_EVENTS_PATH=../logs/events.jsonl
+uv run uvicorn src.backend:app --host 0.0.0.0 --port 8000
 ```
 
-## 8. Qué métricas son offline y qué no
+En PowerShell:
 
-**Offline (medibles aquí con el dataset):** Precision@K, Recall@K,
-HitRate@K, MAP@K sobre el split oficial prior→train, cobertura del
-catálogo, composición repeat/explore de los aciertos y latencia de
-inferencia.
-
-**Solo con usuarios reales (A/B de dos semanas en producción):** la tasa de
-aceptación y el objetivo de ≥ 12 %. Instacart no tiene impresiones,
-posición del widget, grupo de control, ni eventos de aceptación — incluidos
-aquí unicamente como registro de eventos del backend.
-
-## 9. Por qué el 12 % necesita A/B real
-
-No existe señal supervisada de aceptación en el dataset. La aceptación
-depende de factores ajenos al histórico de compras: exposición real del
-widget, inventario y precios vigentes, y comportamiento del usuario frente
-al control. Un A/B (grupo tratamiento vs control, ventana de dos semanas,
-definición de usuario expuesto) es el único diseño causal que puede medir
-el 12 % de aceptación; `Recall@K` offline no es conversión comercial y el
-backend lo advierte en `/v1/metrics/summary`.
-
-## 10. Limitaciones del dataset Instacart
-
-- **Inventario:** no hay stock real; el filtro de agotados solo se puede
-aplicar en tiempo de inferencia con datos en vivo de la tienda.
-
-- **Precio:** sin precios ni promociones; no se puede optimizar margen. El
-catálogo HTTP sí sirve **precios de demostración deterministas** en COP
-(`mismo product_id ⇒ mismo precio`; hash con semilla fija) para la
-interfaz, marcados como demo; no son precios reales.
-
-- **Posición del widget:** sin impresiones ni posición; no hay señal de
-exposición ni de vertical-bias.
-
-- **Aceptación:** sin feedback de usuarios; la métrica comercial solo con A/B.
-
-- **Tiempo:** sin timestamps absolutos (solo `order_number`, `order_dow`,
-`order_hour_of_day`, `days_since_prior_order`); la recencia es relativa.
-
-## 11. Estructura del proyecto
-
-```
-nextcart-agent/
-├── README.md
-├── pyproject.toml          # dependencias del proyecto (uv genera uv.lock)
-├── data/README.md          # dónde dejar los CSV del dataset Instacart
-├── src/
-│   ├── config.py        # rutas, defaults, semilla
-│   ├── schemas.py       # contratos Pydantic (validaciones)
-│   ├── catalog_db.py    # catálogo SQLite del dataset + precios demo deterministas
-│   ├── audit_dataset.py # auditoría S1–S5 con DuckDB + figuras + informe
-│   ├── train_agent.py   # modelo coocurrencia+frecuencia; manifiesto
-│   ├── evaluate_agent.py# offline eval @K, cobertura, repeat/explore, latencia
-│   ├── inference.py     # carga del artefacto (sin reentrenar) + CLI demo
-│   ├── artifacts.py     # validación/verificación de artefacto y manifiesto
-│   ├── storage.py       # JSON atómico, JSONL, hash, timers
-│   └── backend.py       # FastAPI: /health, /v1/*, eventos, métricas y CORS
-├── tests/               # fixtures mini_dataset + 44 tests (sin red)
-├── frontend/            # React + Vite + Chakra (pnpm); ver frontend/README.md
-├── notebooks/nextcart_audit_train.ipynb  # notebook independiente
-├── reports/             # audit_results.json, dataset_audit.md,
-│                        # model_metrics.json, figures/*  (ver README)
-├── artifacts/           # nextcart_model.json + manifest (ver README)
-└── logs/events.jsonl    # eventos del backend (se crea al correr)
+```powershell
+cd backend
+$env:NEXTCART_MODEL_PATH = "../artifacts/nextcart_model.json"
+$env:NEXTCART_EVENTS_PATH = "../logs/events.jsonl"
+uv run uvicorn src.backend:app --host 127.0.0.1 --port 8000
 ```
 
-## 12. Flujo resumido (lo que explica este README)
+La API queda disponible en `http://localhost:8000`. Comprueba el estado:
 
-`auditoría local` → `entrenamiento local` → `artefactos + manifiesto`
-→ `backend` (solo carga y sirve, nunca entrena). Los tests livianos
-(`pytest -q`, 44 tests, segundos) cubren esquemas, inferencia, contratos
-HTTP y pipeline completo sobre un fixture pequeño. El frontend además
-tiene una suite E2E con Playwright (`frontend/e2e`, `pnpm test:e2e`) que
-corre contra el backend real; CI en `.github/workflows/ci.yml`.
+```bash
+curl -s http://localhost:8000/health
+```
+
+### Terminal 2 — frontend
+
+```bash
+cd frontend
+pnpm dev
+```
+
+La interfaz queda disponible en `http://localhost:5173`. El proxy de Vite reenvía `/health` y `/v1/*` al backend.
+
+## Flujo de entrenamiento y evaluación
+
+Los comandos Python se ejecutan desde `backend/`. Los resultados se escriben en las carpetas compartidas de la raíz.
+
+```bash
+cd backend
+
+# 1. Auditar el dataset
+uv run python src/audit_dataset.py \
+  --data-dir ../data \
+  --output-dir ../reports
+
+# 2. Entrenar el agente
+uv run python src/train_agent.py \
+  --data-dir ../data \
+  --output ../artifacts/nextcart_model.json \
+  --metrics-output ../reports/model_metrics.json \
+  --seed 42 --min-support 5 --top-k 100
+
+# 3. Evaluar offline
+uv run python src/evaluate_agent.py \
+  --data-dir ../data \
+  --model ../artifacts/nextcart_model.json \
+  --output ../reports/model_metrics.json
+```
+
+El backend solo carga el artefacto y verifica el manifiesto; no entrena ni descarga datos al arrancar.
+
+## Flujo de datos y endpoints
+
+### Entradas principales
+
+- `session_id`: identificador de sesión.
+- `cart`: productos actuales del carrito.
+- `navigation`: eventos `view`, `reject` y `cart_add`.
+- `recent_history`: cestas anteriores.
+- `rejected`: productos rechazados durante la sesión.
+- `inventory`: disponibilidad por `product_id`.
+- `k`: número de recomendaciones, entre 1 y 10.
+
+### Endpoints
+
+| Método | Ruta | Uso |
+|---|---|---|
+| `GET` | `/health` | Estado del modelo y del catálogo. |
+| `POST` | `/v1/recommendations` | Generar recomendaciones. |
+| `GET` | `/v1/catalog/products` | Buscar y paginar productos. |
+| `GET` | `/v1/catalog/products/{id}` | Consultar un producto. |
+| `GET` | `/v1/catalog/departments` | Listar departamentos. |
+| `GET` | `/v1/catalog/aisles` | Listar pasillos. |
+| `POST` | `/v1/events/impression` | Registrar recomendaciones mostradas. |
+| `POST` | `/v1/events/feedback` | Registrar `accepted`, `rejected` o `ignored`. |
+| `GET` | `/v1/metrics/summary` | Consultar métricas observadas y disclaimer A/B. |
+| `POST` | `/v1/admin/reload-model` | Recargar modelo con token administrativo. |
+
+### Ejemplo de recomendación
+
+```bash
+curl -s -X POST http://localhost:8000/v1/recommendations \
+  -H 'Content-Type: application/json' \
+  -d '{"session_id":"sess-001","cart":[24852,13176],"rejected":[22935],"inventory":{"21137":true,"22935":false},"k":3}'
+```
+
+## Logs y evidencias
+
+Esta tabla conecta cada afirmación de la tarea con el archivo que la respalda.
+
+| Evidencia | Enlace | Qué demuestra |
+|---|---|---|
+| Log de eventos | [`logs/events.jsonl`](logs/events.jsonl) | Impresiones, recomendaciones y feedback registrados por el backend. |
+| Métricas del modelo | [`reports/model_metrics.json`](reports/model_metrics.json) | Precision@K, Recall@K, HitRate@K, MAP@K, cobertura y latencia offline. |
+| Auditoría del dataset | [`reports/audit_results.json`](reports/audit_results.json) | Validaciones S1–S5, supuestos, riesgos y decisión de uso del dataset. |
+| Informe de auditoría | [`reports/dataset_audit.md`](reports/dataset_audit.md) | Interpretación legible de la auditoría y sus figuras. |
+| Figuras de auditoría | [`reports/figures/`](reports/figures/) | Distribuciones, fuga, coocurrencia, tamaño de cesta y composición del split. |
+| Modelo versionado | [`artifacts/nextcart_model.json`](artifacts/nextcart_model.json) | Reglas de coocurrencia, productos populares y metadatos de entrenamiento. |
+| Manifiesto del modelo | [`artifacts/artifact_manifest.json`](artifacts/artifact_manifest.json) | SHA-256, versión, dataset y trazabilidad del artefacto. |
+| Pruebas backend | [`backend/tests/`](backend/tests/) | 44 pruebas de esquemas, inferencia, API, catálogo y pipeline. |
+| Pruebas E2E | [`frontend/e2e/`](frontend/e2e/) | Integración contra backend real: recomendaciones, feedback y fallos. |
+| CI | [`.github/workflows/ci.yml`](.github/workflows/ci.yml) | Ejecución automatizada de backend, typecheck, build y E2E. |
+| Informe académico | [`INFORME_ENTREGA_NEXTCART.md`](INFORME_ENTREGA_NEXTCART.md) | Diseño, matriz, cumplimiento, limitaciones y conclusiones. |
+
+> Los logs JSONL pueden crecer cuando se ejecuta la aplicación. No deben interpretarse como evidencia de conversión comercial sin grupo control, población expuesta y ventana A/B.
+
+## Pruebas
+
+### Backend
+
+```bash
+cd backend
+uv run pytest -q
+```
+
+Resultado de referencia: **44 pruebas aprobadas**.
+
+### Frontend: typecheck y build
+
+```bash
+cd frontend
+pnpm exec tsc -b
+pnpm build
+```
+
+### E2E con Playwright
+
+```bash
+cd frontend
+pnpm exec playwright install chromium
+pnpm exec playwright test
+```
+
+Resultado de referencia: **8 escenarios aprobados** contra el backend real.
+
+## Métricas y alcance
+
+Las métricas offline se calcularon sobre 131.209 usuarios del split `prior → train` de Instacart:
+
+| Métrica | NEXTCART | Baseline topfreq | Baseline cooccur |
+|---|---:|---:|---:|
+| Precision@3 | 0,2222 | 0,1076 | 0,1114 |
+| Recall@3 | 0,0803 | 0,0322 | 0,0360 |
+| HitRate@3 | 0,4890 | 0,2980 | 0,2815 |
+| MAP@3 | 0,1788 | 0,0740 | 0,0805 |
+
+La latencia offline reportada es de **2,62 ms de media** y **3,86 ms p95**. La rama actual no implementa un simulador con oracle de productos esperados ni un simulador estocástico de aceptación; por eso la calidad del simulador y la conversión proxy quedan como pendientes, no como valores inventados.
+
+El KPI comercial de aceptación ≥ 12 % requiere un A/B real de dos semanas. Instacart no contiene impresiones, posición del widget, grupo control ni aceptación de usuarios.
+
+## Limitaciones
+
+- El inventario llega como mapa en la solicitud; no hay API real de inventario.
+- Los precios son valores de demostración deterministas porque Instacart no contiene precios.
+- No hay autenticación ni persistencia de memoria por usuario real.
+- Falta reentrenamiento programado con validación y rollback.
+- El lint global del frontend conserva errores heredados del template; typecheck, build y E2E pasan.
+- La conversión comercial no se puede inferir de Recall@K ni de los logs locales.
+
+## Créditos y documentación complementaria
+
+- Frontend: [`frontend/README.md`](frontend/README.md)
+- Backend: [`backend/README.md`](backend/README.md)
+- Datos: [`data/README.md`](data/README.md)
+- Artefactos: [`artifacts/README.md`](artifacts/README.md)
+- Reportes: [`reports/README.md`](reports/README.md)

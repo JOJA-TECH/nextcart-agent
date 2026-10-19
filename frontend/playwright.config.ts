@@ -22,11 +22,11 @@ export default defineConfig({
     },
     {
       command:
-        "uv --directory .. run uvicorn src.backend:app --host 127.0.0.1 --port 8000",
+        "uv --directory ../backend run uvicorn src.backend:app --host 127.0.0.1 --port 8000",
       url: "http://localhost:8000/health",
       reuseExistingServer: !process.env.CI,
       timeout: 120_000,
-      env: { NEXTCART_MODEL_PATH: "artifacts/nextcart_model.json" },
+      env: { NEXTCART_MODEL_PATH: "../artifacts/nextcart_model.json" },
     },
   ],
 })

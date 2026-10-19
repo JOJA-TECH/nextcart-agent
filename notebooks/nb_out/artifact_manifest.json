@@ -1,10 +1,10 @@
 {
   "model_path": "nextcart_model.json",
-  "model_version": "notebook-0.1.0-2026-10-18T172140Z",
-  "created_at_utc": "2026-10-18T17:21:40Z",
+  "model_version": "notebook-0.1.0-2026-10-18T162642Z",
+  "created_at_utc": "2026-10-18T16:26:42Z",
   "source_dataset": "instacart-online-grocery-basket-analysis-dataset",
   "training_code_version": "notebook-independiente (sin dependencia de src/)",
-  "audit_results_path": "/home/chaos/Projects/universidad/ia/nextcart-agent/notebooks/nb_out/audit_results.json",
-  "metrics_path": "/home/chaos/Projects/universidad/ia/nextcart-agent/notebooks/nb_out/model_metrics.json",
-  "sha256": "c7b3c4a4e8743b2803a08faf133cf2cabcf61b4eb72a5cf7d8cf1d0d116fa6b7"
+  "audit_results_path": "/content/nb_out/audit_results.json",
+  "metrics_path": "/content/nb_out/model_metrics.json",
+  "sha256": "02465324b46ccea54ee0e441378a0ed7a02bb8f5a3564cd6c54514d4323750e4"
 }

@@ -167,15 +167,15 @@ export function CatalogBrowser({
             aria-label="Buscar producto en el catálogo"
           />
         </Field.Root>
-        <Field.Root maxW={{ base: "full", sm: "44" }}>
-          <Field.Label textStyle="xs">Departamento</Field.Label>
-          <NativeSelect.Root
-            size="sm"
-            value={departmentId === null ? "" : String(departmentId)}
-          >
-            <NativeSelect.Field
-              aria-label="Filtrar por departamento"
-              onChange={(e) => onDepartmentChange(e.currentTarget.value)}
+          <Field.Root maxW={{ base: "full", sm: "44" }}>
+            <Field.Label textStyle="xs">Departamento</Field.Label>
+            <NativeSelect.Root
+              size="sm"
+            >
+              <NativeSelect.Field
+                aria-label="Filtrar por departamento"
+                value={departmentId === null ? "" : String(departmentId)}
+                onChange={(e) => onDepartmentChange(e.currentTarget.value)}
             >
               <option value="">Todos</option>
               {(departments.data ?? []).map((d) => (
@@ -187,16 +187,16 @@ export function CatalogBrowser({
             <NativeSelect.Indicator />
           </NativeSelect.Root>
         </Field.Root>
-        <Field.Root maxW={{ base: "full", sm: "44" }}>
-          <Field.Label textStyle="xs">Pasillo</Field.Label>
-          <NativeSelect.Root
-            size="sm"
-            value={aisleId === null ? "" : String(aisleId)}
-            disabled={departmentId === null}
-          >
-            <NativeSelect.Field
-              aria-label="Filtrar por pasillo"
-              onChange={(e) => onAisleChange(e.currentTarget.value)}
+          <Field.Root maxW={{ base: "full", sm: "44" }}>
+            <Field.Label textStyle="xs">Pasillo</Field.Label>
+            <NativeSelect.Root
+              size="sm"
+              disabled={departmentId === null}
+            >
+              <NativeSelect.Field
+                aria-label="Filtrar por pasillo"
+                value={aisleId === null ? "" : String(aisleId)}
+                onChange={(e) => onAisleChange(e.currentTarget.value)}
             >
               <option value="">Todos</option>
               {(aisles.data ?? []).map((a) => (
