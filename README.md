@@ -148,7 +148,7 @@ Variables de entorno:
 | `NEXTCART_CATALOG_DB_PATH` | Ruta de la BD SQLite del catálogo (default `data/catalog.db`; se construye sola si falta) |
 | `NEXTCART_MANIFEST_PATH` | Ruta del manifiesto (opcional; por defecto junto al modelo) |
 | `NEXTCART_ADMIN_TOKEN` | Habilita y protege `POST /v1/admin/reload-model` |
-| `NEXTCART_EVENTS_PATH` | Ruta del log de eventos (default `logs/events.jsonl`) |
+| `NEXTCART_EVENTS_PATH` | Ruta del log de eventos (default local `logs/events.jsonl`; en Vercel `/tmp/nextcart-agent/events.jsonl`, efímero) |
 | `NEXTCART_CORS_ORIGINS` | Orígenes CORS permitidos, separados por comas (default: Vite en `localhost:5173`/`4173`) |
 
 ## 7. Probar los endpoints con curl

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import tempfile
 from pathlib import Path
 
 import pytest
@@ -145,3 +146,16 @@ def test_admin_reload_disabled_without_token_config(tmp_path: Path,
     with TestClient(app) as c:
         r = c.post("/v1/admin/reload-model")
         assert r.status_code == 404
+
+
+def test_vercel_uses_writable_directory_for_event_log(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    monkeypatch.setenv("VERCEL", "1")
+    monkeypatch.delenv("NEXTCART_EVENTS_PATH", raising=False)
+
+    app = create_app()
+
+    assert app.state.nc.events_path == (
+        Path(tempfile.gettempdir()) / "nextcart-agent" / "events.jsonl"
+    )
