@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import os
 import sqlite3
+import tempfile
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
@@ -133,6 +134,10 @@ def create_app(
     state.catalog_db_path = Path(env_catalog_db)
     if env_events:
         state.events_path = Path(env_events)
+    elif os.environ.get("VERCEL"):
+        state.events_path = (
+            Path(tempfile.gettempdir()) / "nextcart-agent" / "events.jsonl"
+        )
     ensure_dir(state.events_path.parent)
 
     @asynccontextmanager
