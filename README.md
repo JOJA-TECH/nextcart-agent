@@ -11,16 +11,16 @@ coocurrencia en cestas** (soporte, confianza, lift, recencia relativa,
 boost de recompra, filtros de inventario/rechazo en inferencia). Sin LLM.
 
 > ⚠️ El objetivo comercial de **≥ 12 % de aceptación en un A/B de dos
-> semanas** no puede validarse con Instacart: el dataset no contiene
-> impresiones, exposición, grupo control ni feedback de usuarios. Las
-> métricas de este proyecto son **offline** (predicción de cesta).
+semanas** no puede validarse con Instacart: el dataset no contiene
+impresiones, exposición, grupo control ni feedback de usuarios. Las
+métricas de este proyecto son **offline** (predicción de cesta).
 
 ---
 
 ## 1. Qué hace el proyecto
 
 | Etapa | Script | Qué produce |
-|---|---|---|
+| --- | --- | --- |
 | Auditoría del dataset | `src/audit_dataset.py` | `reports/audit_results.json`, `reports/dataset_audit.md`, `reports/figures/*.png` |
 | Entrenamiento | `src/train_agent.py` | `artifacts/nextcart_model.json`, `artifacts/artifact_manifest.json` |
 | Evaluación offline | `src/evaluate_agent.py` | `reports/model_metrics.json`, `reports/figures/model_metrics_at_k.png` |
@@ -33,24 +33,29 @@ boost de recompra, filtros de inventario/rechazo en inferencia). Sin LLM.
 ## 2. Todo se ejecuta en el equipo local
 
 - No hay plataformas externas ni descargas automáticas. El dataset se lee
-  desde disco (por defecto `dataset/` o `data/`; configurable con
-  `--data-dir` o `NEXTCART_DATA_DIR`).
+desde disco (por defecto `dataset/` o `data/`; configurable con
+`--data-dir` o `NEXTCART_DATA_DIR`).
+
 - Lectura por consultas con **DuckDB**, con límite de memoria configurable
-  (`--duckdb-memory-limit`) y volcado a disco (`--spill-dir`; evita `/tmp`
-  si es tmpfs). Los pares de coocurrencia se generan **por bloques** y se
-  escriben a parquet temporal para no materializar 150M+ de pares en RAM.
+(`--duckdb-memory-limit`) y volcado a disco (`--spill-dir`; evita `/tmp`
+si es tmpfs). Los pares de coocurrencia se generan **por bloques** y se
+escriben a parquet temporal para no materializar 150M+ de pares en RAM.
+
 - Configurable: rutas, `--workers`, `--block-size`, muestreo opcional
-  (`--sample-users`, `--max-eval-users`; queda documentado en los
-  metadatos con método/semilla/motivo). La ejecución completa es el default.
+(`--sample-users`, `--max-eval-users`; queda documentado en los
+metadatos con método/semilla/motivo). La ejecución completa es el default.
+
 - Cada paso imprime qué se está ejecutando y cuánto tarda (`StepTimer`).
+
 - Si faltan archivos del dataset, el script aborta mostrando los que
-  faltan e instrucciones exactas de corrección. Nunca inventa resultados.
+faltan e instrucciones exactas de corrección. Nunca inventa resultados.
+
 - Todos los resultados se escriben a disco y pueden revisarse después.
 
 ### Requisitos de recursos
 
 | Recurso | Mínimo recomendado |
-|---|---|
+| --- | --- |
 | RAM | 6–8 GB (DuckDB limitado a 2 GB por defecto) |
 | Disco | ~1 GB libre en `reports/` y spill dir |
 | CPU | 4+ núcleos útiles para evaluación paralela (`--workers`) |
@@ -113,7 +118,7 @@ export NEXTCART_MODEL_PATH=artifacts/nextcart_model.json
 uv run uvicorn src.backend:app --host 0.0.0.0 --port 8000
 ```
 
-```powershell
+```
 # Windows (PowerShell)
 $env:NEXTCART_MODEL_PATH = "artifacts/nextcart_model.json"
 uv run uvicorn src.backend:app --host 127.0.0.1 --port 8000
@@ -129,7 +134,7 @@ pnpm dev    # http://localhost:5173
 
 Por defecto el frontend llama por rutas relativas y el **proxy de Vite**
 reenvía `/v1` y `/health` al backend (`http://localhost:8000`, configurable
-con `NEXTCART_BACKEND_URL`). Alternativa: llamar directo configurando
+con `NEXTCART_BACKEND_URL` ). Alternativa: llamar directo configurando
 `VITE_NEXTCART_API_BASE_URL` en `frontend/.env` (ver `frontend/.env.example`);
 el backend ya habilita CORS para los orígenes de Vite
 (`localhost:5173/4173`). Detalles en `frontend/README.md`.
@@ -142,7 +147,7 @@ hash). Sin modelo: `/health` responde `model_loaded: false` con instrucciones.
 Variables de entorno:
 
 | Variable | Uso |
-|---|---|
+| --- | --- |
 | `NEXTCART_MODEL_PATH` | Ruta del artefacto del modelo (obligatoria para servir) |
 | `NEXTCART_DATA_DIR` | Directorio de los CSV de Instacart para construir el catálogo (default `data/`) |
 | `NEXTCART_CATALOG_DB_PATH` | Ruta de la BD SQLite del catálogo (default `data/catalog.db`; se construye sola si falta) |
@@ -220,16 +225,20 @@ backend lo advierte en `/v1/metrics/summary`.
 ## 10. Limitaciones del dataset Instacart
 
 - **Inventario:** no hay stock real; el filtro de agotados solo se puede
-  aplicar en tiempo de inferencia con datos en vivo de la tienda.
+aplicar en tiempo de inferencia con datos en vivo de la tienda.
+
 - **Precio:** sin precios ni promociones; no se puede optimizar margen. El
-  catálogo HTTP sí sirve **precios de demostración deterministas** en COP
-  (`mismo product_id ⇒ mismo precio`; hash con semilla fija) para la
-  interfaz, marcados como demo; no son precios reales.
+catálogo HTTP sí sirve **precios de demostración deterministas** en COP
+(`mismo product_id ⇒ mismo precio`; hash con semilla fija) para la
+interfaz, marcados como demo; no son precios reales.
+
 - **Posición del widget:** sin impresiones ni posición; no hay señal de
-  exposición ni de vertical-bias.
+exposición ni de vertical-bias.
+
 - **Aceptación:** sin feedback de usuarios; la métrica comercial solo con A/B.
+
 - **Tiempo:** sin timestamps absolutos (solo `order_number`, `order_dow`,
-  `order_hour_of_day`, `days_since_prior_order`); la recencia es relativa.
+`order_hour_of_day`, `days_since_prior_order`); la recencia es relativa.
 
 ## 11. Estructura del proyecto
 
@@ -249,7 +258,7 @@ nextcart-agent/
 │   ├── artifacts.py     # validación/verificación de artefacto y manifiesto
 │   ├── storage.py       # JSON atómico, JSONL, hash, timers
 │   └── backend.py       # FastAPI: /health, /v1/*, eventos, métricas y CORS
-├── tests/               # fixtures mini_dataset + 37 tests (sin red)
+├── tests/               # fixtures mini_dataset + 44 tests (sin red)
 ├── frontend/            # React + Vite + Chakra (pnpm); ver frontend/README.md
 ├── notebooks/nextcart_audit_train.ipynb  # notebook independiente
 ├── reports/             # audit_results.json, dataset_audit.md,
@@ -262,7 +271,7 @@ nextcart-agent/
 
 `auditoría local` → `entrenamiento local` → `artefactos + manifiesto`
 → `backend` (solo carga y sirve, nunca entrena). Los tests livianos
-(`pytest -q`, 37 tests, segundos) cubren esquemas, inferencia, contratos
+(`pytest -q`, 44 tests, segundos) cubren esquemas, inferencia, contratos
 HTTP y pipeline completo sobre un fixture pequeño. El frontend además
 tiene una suite E2E con Playwright (`frontend/e2e`, `pnpm test:e2e`) que
 corre contra el backend real; CI en `.github/workflows/ci.yml`.
