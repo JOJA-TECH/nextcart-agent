@@ -17,7 +17,6 @@ from __future__ import annotations
 
 import os
 import sqlite3
-import tempfile
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
@@ -134,10 +133,6 @@ def create_app(
     state.catalog_db_path = Path(env_catalog_db)
     if env_events:
         state.events_path = Path(env_events)
-    elif os.environ.get("VERCEL"):
-        state.events_path = (
-            Path(tempfile.gettempdir()) / "nextcart-agent" / "events.jsonl"
-        )
     ensure_dir(state.events_path.parent)
 
     @asynccontextmanager
@@ -171,9 +166,9 @@ def create_app(
         yield
 
     app = FastAPI(title="NEXTCART-AGENT", version="0.1.0", lifespan=lifespan)
-    # CORS para el frontend en desarrollo (Vite dev :5173 y preview :4173);
-    # configurable con NEXTCART_CORS_ORIGINS (separada por comas) para otros
-    # despliegues. En producción también se puede usar el proxy inverso.
+    # CORS para Vite y despliegues externos (por ejemplo Vercel). En producción
+    # se configura con NEXTCART_CORS_ORIGINS, separada por comas. Se admite una
+    # expresión regular opcional para URLs preview de Vercel.
     default_origins = [
         "http://localhost:5173",
         "http://127.0.0.1:5173",
@@ -181,16 +176,26 @@ def create_app(
         "http://127.0.0.1:4173",
     ]
     raw_origins = os.environ.get("NEXTCART_CORS_ORIGINS")
+
+    def normalize_origin(origin: str) -> str:
+        # El navegador envía el origin sin slash final; toleramos que el valor
+        # de Coolify haya sido copiado como URL completa con slash.
+        return origin.strip().rstrip("/")
+
     cors_origins = (
-        [origin.strip() for origin in raw_origins.split(",") if origin.strip()]
+        [normalize_origin(origin) for origin in raw_origins.split(",") if origin.strip()]
         if raw_origins
         else default_origins
     )
+    cors_origin_regex = os.environ.get("NEXTCART_CORS_ORIGIN_REGEX")
     app.add_middleware(
         CORSMiddleware,
         allow_origins=cors_origins,
+        allow_origin_regex=cors_origin_regex or None,
         allow_methods=["*"],
         allow_headers=["*"],
+        allow_credentials=True,
+        max_age=600,
     )
     app.state.nc = state
     app.state.admin_token = env_token
